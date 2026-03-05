@@ -47,9 +47,10 @@ class ScenarioPickerScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0A0E1A),
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+      body: SingleChildScrollView(
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
               'DRIFT COMMAND',
@@ -87,6 +88,7 @@ class ScenarioPickerScreen extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }
