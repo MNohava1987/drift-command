@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:flame/events.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/services.dart' show rootBundle;
@@ -40,12 +41,16 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
   /// Approach speed for the next issued order: 0.25 / 0.5 / 1.0
   double selectedSpeed = 0.5;
 
+  /// Visual-only transit pulses. Each entry is [fromPos, toPos, progress 0→1, speed].
+  final List<TransitPulse> transitPulses = [];
+
   // ── HUD notifiers (listened to by Flutter widgets) ───────────────────────
   final tempoBandNotifier = ValueNotifier<TempoBand>(TempoBand.distant);
   final selectedShipNotifier = ValueNotifier<ShipState?>(null);
   final battlePhaseNotifier = ValueNotifier<BattlePhase>(BattlePhase.setup);
   final battleTimeTextNotifier = ValueNotifier<String>('0:00');
   final commandPulseReadyNotifier = ValueNotifier<bool>(false);
+  final isPausedNotifier = ValueNotifier<bool>(false);
 
   // ── Public accessors ─────────────────────────────────────────────────────
   BattleState get battleState => _state;
@@ -77,6 +82,7 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
     if (!_isInitialized) return;
     if (_state.phase != BattlePhase.active) return;
 
+    if (isPausedNotifier.value) return;
     _tempoSystem.update(_state, dt);
     _ai.update(_state, dt);
 
@@ -90,6 +96,8 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
 
     _combat.update(_state, dt);
     _checkWinLoss();
+
+    _advanceTransitPulses(dt);
 
     // Refresh HUD notifiers
     tempoBandNotifier.value = _state.tempoBand;
@@ -163,6 +171,50 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
     }
     _tempoSystem.advanceCommandPulse(_state);
     commandPulseReadyNotifier.value = false;
+    _spawnOrderPulse(_selectedShip!);
+  }
+
+  /// Spawns a visual pulse traveling from flagship → relay → target ship.
+  void _spawnOrderPulse(ShipState target) {
+    final topology = _state.topologies[_state.playerFactionId];
+    if (topology == null) return;
+    final flagship = _state.ships[topology.flagship.shipInstanceId];
+    if (flagship == null) return;
+
+    final relayNodeId = target.assignedCommandNodeId;
+    final relayNode = relayNodeId != null ? topology.nodes[relayNodeId] : null;
+    final relay = relayNode != null ? _state.ships[relayNode.shipInstanceId] : null;
+
+    if (relay != null && relay.isAlive && relay.instanceId != flagship.instanceId) {
+      // Two-leg pulse: flagship → relay → target
+      final leg1Dist = flagship.position.distanceTo(relay.position);
+      final leg2Dist = relay.position.distanceTo(target.position);
+      final leg1Duration = (leg1Dist / 20.0).clamp(0.5, 8.0);
+      final leg2Duration = (leg2Dist / 20.0).clamp(0.3, 6.0);
+      spawnTransitPulse(flagship.position, relay.position, leg1Duration);
+      // Leg 2 starts after leg 1 — approximate by scheduling slightly offset
+      // (for MVP, spawn both immediately; renderer shows both)
+      spawnTransitPulse(relay.position, target.position, leg2Duration);
+    } else {
+      // Direct flagship → target
+      final dist = flagship.position.distanceTo(target.position);
+      final duration = (dist / 20.0).clamp(0.5, 10.0);
+      spawnTransitPulse(flagship.position, target.position, duration);
+    }
+  }
+
+  void togglePause() {
+    if (_state.phase != BattlePhase.active) return;
+    isPausedNotifier.value = !isPausedNotifier.value;
+  }
+
+  /// Cancel all pending and active orders for the selected ship.
+  /// Ship coasts on current velocity until a new order arrives.
+  void cancelOrders() {
+    if (!_isInitialized) return;
+    if (_selectedShip == null || !_selectedShip!.isAlive) return;
+    _selectedShip!.pendingOrders.clear();
+    _selectedShip!.activeOrder = null;
   }
 
   @override
@@ -186,6 +238,7 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
     );
     _tempoSystem.advanceCommandPulse(_state);
     commandPulseReadyNotifier.value = false;
+    _spawnOrderPulse(_selectedShip!);
   }
 
   /// Issue a RETREAT order (move to own flagship position) to the selected ship.
@@ -207,6 +260,7 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
     );
     _tempoSystem.advanceCommandPulse(_state);
     commandPulseReadyNotifier.value = false;
+    _spawnOrderPulse(_selectedShip!);
   }
 
   void _checkWinLoss() {
@@ -250,4 +304,38 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
     overlays.remove('hud');
     overlays.add(won ? 'win' : 'lose');
   }
+
+  /// Spawns a visual transit pulse from [from] to [to] over [duration] seconds.
+  void spawnTransitPulse(Vector2 from, Vector2 to, double duration) {
+    transitPulses.add(TransitPulse(
+      from: from.clone(),
+      to: to.clone(),
+      progress: 0.0,
+      speed: 1.0 / duration,
+    ));
+  }
+
+  void _advanceTransitPulses(double dt) {
+    transitPulses.removeWhere((p) {
+      p.progress += p.speed * dt;
+      return p.progress >= 1.0;
+    });
+  }
+}
+
+/// A visual-only dot that travels along the command chain when an order is issued.
+class TransitPulse {
+  final Vector2 from;
+  final Vector2 to;
+  double progress; // 0.0 → 1.0
+  final double speed; // progress units per second
+
+  TransitPulse({
+    required this.from,
+    required this.to,
+    required this.progress,
+    required this.speed,
+  });
+
+  Vector2 get currentPos => from + (to - from) * progress;
 }

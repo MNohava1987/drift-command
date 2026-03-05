@@ -62,6 +62,35 @@ class _TopBar extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
           ),
+          const SizedBox(width: 12),
+          ValueListenableBuilder<bool>(
+            valueListenable: game.isPausedNotifier,
+            builder: (_, paused, _) => GestureDetector(
+              onTap: game.togglePause,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: paused ? Colors.amber : Colors.white24,
+                  ),
+                  borderRadius: BorderRadius.circular(4),
+                  color: paused
+                      ? Colors.amber.withAlpha(30)
+                      : Colors.transparent,
+                ),
+                child: Text(
+                  paused ? 'RESUME' : 'PAUSE',
+                  style: TextStyle(
+                    color: paused ? Colors.amber : Colors.white54,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -137,6 +166,12 @@ class _ActionBar extends StatelessWidget {
                     label: 'RETREAT',
                     enabled: pulseReady,
                     onPressed: game.issueRetreat,
+                  ),
+                  const SizedBox(width: 8),
+                  _CommandButton(
+                    label: 'CANCEL',
+                    enabled: true,
+                    onPressed: game.cancelOrders,
                   ),
                   const SizedBox(width: 12),
                   _PulseIndicator(ready: pulseReady),

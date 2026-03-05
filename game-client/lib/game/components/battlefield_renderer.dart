@@ -89,10 +89,12 @@ class BattlefieldRenderer extends Component {
     final state = game.battleStateOrNull;
     if (state == null) return;
     _drawBackground(canvas);
+    _drawCommandChainLines(canvas, state);
     _drawTrajectories(canvas, state);
     _drawSensorGhosts(canvas, state);
     _drawOrderLines(canvas, state);
     _drawShips(canvas, state);
+    _drawTransitPulses(canvas);
   }
 
   // ── Background ────────────────────────────────────────────────────────────
@@ -273,6 +275,10 @@ class BattlefieldRenderer extends Component {
 
     canvas.drawCircle(co, radius, Paint()..color = color);
 
+    // Ship type label
+    _drawShipLabel(canvas, _labelForRole(role), co, radius,
+        ship.factionId == state.playerFactionId);
+
     // Velocity heading line (direction of travel)
     if (ship.velocity.length > 1.0) {
       final velDir = ship.velocity.normalized();
@@ -420,4 +426,84 @@ class BattlefieldRenderer extends Component {
         ShipRole.fastRaider => 90.0,
         ShipRole.commandRelay => 80.0,
       };
+
+  String _labelForRole(ShipRole role) => switch (role) {
+        ShipRole.flagship => 'F',
+        ShipRole.commandRelay => 'R',
+        ShipRole.heavyLine => 'H',
+        ShipRole.lightEscort => 'E',
+        ShipRole.strikeCarrier => 'C',
+        ShipRole.fastRaider => 'X',
+      };
+
+  void _drawShipLabel(
+    Canvas canvas,
+    String label,
+    Offset center,
+    double radius,
+    bool isPlayer,
+  ) {
+    final fontSize = (radius * 1.1).clamp(6.0, 11.0);
+    final pb = ParagraphBuilder(
+      ParagraphStyle(textAlign: TextAlign.center),
+    )
+      ..pushStyle(TextStyle(
+        color: const Color(0xFFFFFFFF),
+        fontSize: fontSize,
+        fontWeight: FontWeight.bold,
+      ))
+      ..addText(label);
+    final para = pb.build()
+      ..layout(ParagraphConstraints(width: radius * 2));
+    canvas.drawParagraph(
+      para,
+      Offset(center.dx - radius, center.dy - para.height / 2),
+    );
+  }
+
+  // ── Command chain lines ────────────────────────────────────────────────────
+
+  void _drawCommandChainLines(Canvas canvas, BattleState state) {
+    final topology = state.topologies[state.playerFactionId];
+    if (topology == null) return;
+    final flagship = state.ships[topology.flagship.shipInstanceId];
+    if (flagship == null || !flagship.isAlive) return;
+
+    final flagshipC = worldToCanvas(flagship.position);
+    final flagshipO = Offset(flagshipC.x, flagshipC.y);
+
+    final flagshipToRelayPaint = Paint()
+      ..color = const Color(0x26FFFFFF) // 15% white
+      ..strokeWidth = 1.0;
+    final relayToCombatPaint = Paint()
+      ..color = const Color(0x1AFFFFFF) // 10% white
+      ..strokeWidth = 0.8;
+
+    for (final node in topology.nodes.values) {
+      if (node.isRoot) continue;
+      final relay = state.ships[node.shipInstanceId];
+      if (relay == null || !relay.isAlive) continue;
+
+      final relayC = worldToCanvas(relay.position);
+      final relayO = Offset(relayC.x, relayC.y);
+      canvas.drawLine(flagshipO, relayO, flagshipToRelayPaint);
+
+      for (final combatId in node.assignedCombatShipIds) {
+        final combat = state.ships[combatId];
+        if (combat == null || !combat.isAlive) continue;
+        final combatC = worldToCanvas(combat.position);
+        canvas.drawLine(relayO, Offset(combatC.x, combatC.y), relayToCombatPaint);
+      }
+    }
+  }
+
+  // ── Transit pulses ─────────────────────────────────────────────────────────
+
+  void _drawTransitPulses(Canvas canvas) {
+    final paint = Paint()..color = const Color(0xFFFFDD44);
+    for (final pulse in game.transitPulses) {
+      final pos = worldToCanvas(pulse.currentPos);
+      canvas.drawCircle(Offset(pos.x, pos.y), 3.0, paint);
+    }
+  }
 }
