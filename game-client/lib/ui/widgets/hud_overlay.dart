@@ -121,7 +121,7 @@ class _ActionBar extends StatelessWidget {
           builder: (_, pulseReady, _) {
             return Container(
               color: Colors.black.withAlpha(140),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
