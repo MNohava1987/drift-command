@@ -1,0 +1,42 @@
+name: Terraform Apply
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'infra/**'
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  apply-dev:
+    name: Apply (dev)
+    runs-on: ubuntu-latest
+    environment: dev   # requires GitHub Environment approval if configured
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        working-directory: infra/envs/dev
+        run: terraform init
+        env:
+          TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Terraform Apply
+        working-directory: infra/envs/dev
+        run: terraform apply -auto-approve
+        env:
+          TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+          TF_VAR_github_repo: MNohava1987/drift-command

@@ -1,0 +1,53 @@
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfplan
+.terraform.lock.hcl
+terraform.tfvars
+!terraform.tfvars.example
+*.auto.tfvars
+!*.auto.tfvars.example
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Flutter / Dart
+game-client/.dart_tool/
+game-client/.flutter-plugins
+game-client/.flutter-plugins-dependencies
+game-client/.packages
+game-client/build/
+game-client/.pub-cache/
+game-client/.pub/
+game-client/coverage/
+game-client/doc/api/
+game-client/*.iml
+game-client/android/.gradle/
+game-client/android/local.properties
+game-client/android/key.properties
+game-client/android/app/google-services.json
+game-client/ios/.symlinks/
+game-client/ios/Flutter/flutter_export_environment.sh
+game-client/ios/Flutter/Generated.xcconfig
+
+# IDE
+.idea/
+.vscode/settings.json
+*.swp
+*.swo
+.DS_Store
+
+# Secrets / env
+.env
+*.env
+.envrc
+credentials.json
+service-account-key.json
+*.pem
+*.p12
+
+# Logs
+*.log

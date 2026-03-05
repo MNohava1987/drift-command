@@ -1,0 +1,50 @@
+name: Terraform Plan
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'infra/**'
+
+permissions:
+  id-token: write   # required for OIDC
+  contents: read
+  pull-requests: write
+
+jobs:
+  plan-dev:
+    name: Plan (dev)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Format Check
+        working-directory: infra/envs/dev
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Init
+        working-directory: infra/envs/dev
+        run: terraform init
+        env:
+          TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Terraform Validate
+        working-directory: infra/envs/dev
+        run: terraform validate
+
+      - name: Terraform Plan
+        working-directory: infra/envs/dev
+        run: terraform plan -no-color -out=tfplan
+        env:
+          TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+          TF_VAR_github_repo: MNohava1987/drift-command
