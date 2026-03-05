@@ -152,10 +152,28 @@ MVP is the minimum that makes the **physics feel real** and the **Admiral role f
 
 ### Post-MVP (documented, not built yet)
 
+**M3 — Physics feel**
+- True momentum physics (ships coast, thrust changes vector gradually)
+- Speed setting per order (slow / medium / fast)
+- Trajectory projection lines
+- Sensor delay on enemy positions with projected cone
+- Strategic view zoom (scroll/pinch to zoom in on engagements)
+- Tutorial
+
+**M4 — Command depth**
 - Commander interpretation layer (doctrine knobs, compliance variance)
-- Commander view
-- Bridge view / multi-panel display
 - Formation orders (group selection + formation shapes)
+- Commander view
+
+**M5 — Visuals**
+- Ship silhouette sprites per class (top-down 2D, not 3D)
+- Engine trail particles
+- Weapon fire and explosion particles
+- Parallax starfield / background nebula / planet
+- HUD and tactical display polish (military aesthetic)
+
+**M6+ — Scale and multiplayer**
+- Bridge view / multi-panel Admiral display
 - Multiplayer Commander slots
 - Adaptive Commander behavior (history-based weight adjustment)
 - Scenario editor
