@@ -12,36 +12,75 @@ class KinematicSystem {
   KinematicSystem({required this.shipDataRegistry});
 
   /// Update all ship positions for one simulation step.
-  void update(List<ShipState> ships, double dt) {
+  ///
+  /// [battleTime] is the current battle clock (used to promote pending orders).
+  /// [allShips] is the full ship map (used for attackTarget tracking).
+  void update(
+    List<ShipState> ships,
+    double dt, {
+    double battleTime = 0.0,
+    Map<String, ShipState> allShips = const {},
+  }) {
     for (final ship in ships) {
       if (!ship.isAlive) continue;
-      _applyCurrentOrder(ship, dt);
+      final data = shipDataRegistry[ship.dataId];
+      if (data == null) continue;
+      _promoteReadyOrders(ship, battleTime);
+      _executeActiveOrder(ship, data, dt, allShips);
       _integratePosition(ship, dt);
     }
   }
 
-  void _applyCurrentOrder(ShipState ship, double dt) {
-    final data = shipDataRegistry[ship.dataId];
-    if (data == null) return;
+  /// Moves the first arrived pending order into [ship.activeOrder].
+  void _promoteReadyOrders(ShipState ship, double battleTime) {
+    if (ship.activeOrder != null) return;
+    final idx = ship.pendingOrders.indexWhere((o) => o.isReady(battleTime));
+    if (idx >= 0) {
+      ship.activeOrder = ship.pendingOrders[idx];
+      ship.pendingOrders.removeAt(idx);
+    }
+  }
 
-    final ready = ship.pendingOrders
-        .where((o) => o.isReady(ship.pendingOrders.first.issuedAt))
-        .toList();
-
-    if (ready.isEmpty) return;
-
-    final order = ready.first;
+  /// Applies the currently active order to the ship for one tick.
+  void _executeActiveOrder(
+    ShipState ship,
+    ShipData data,
+    double dt,
+    Map<String, ShipState> allShips,
+  ) {
+    final order = ship.activeOrder;
+    if (order == null) return;
 
     switch (order.type) {
       case OrderType.moveTo:
         if (order.targetPosition != null) {
+          final dist = ship.position.distanceTo(order.targetPosition!);
+          if (dist < 10.0) {
+            ship.activeOrder = null;
+            return;
+          }
           _steerToward(ship, data, order.targetPosition!, dt);
+        }
+      case OrderType.attackTarget:
+        final targetPos = (order.targetShipId != null
+                ? allShips[order.targetShipId]?.position
+                : null) ??
+            order.targetPosition;
+        if (targetPos != null) {
+          _steerToward(ship, data, targetPos, dt);
         }
       case OrderType.hold:
         _decelerate(ship, data, dt);
       case OrderType.retreat:
         if (order.targetPosition != null) {
+          final dist = ship.position.distanceTo(order.targetPosition!);
+          if (dist < 10.0) {
+            ship.activeOrder = null;
+            return;
+          }
           _steerToward(ship, data, order.targetPosition!, dt);
+        } else {
+          _decelerate(ship, data, dt);
         }
       default:
         break;
@@ -90,8 +129,12 @@ class KinematicSystem {
   }
 
   double _normalizeAngle(double angle) {
-    while (angle > math.pi) { angle -= 2 * math.pi; }
-    while (angle < -math.pi) { angle += 2 * math.pi; }
+    while (angle > math.pi) {
+      angle -= 2 * math.pi;
+    }
+    while (angle < -math.pi) {
+      angle += 2 * math.pi;
+    }
     return angle;
   }
 

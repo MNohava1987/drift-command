@@ -74,6 +74,7 @@ class ShipState {
 
   String? assignedCommandNodeId;   // which command ship this unit reports to
   List<Order> pendingOrders;
+  Order? activeOrder;              // order currently being executed
   Doctrine activeDoctrine;
 
   ShipState({

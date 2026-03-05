@@ -1,0 +1,82 @@
+{
+  "id": "scenario_001",
+  "name": "First Contact",
+  "objective": "Destroy the enemy flagship",
+  "playerFactionId": 0,
+  "winCondition": {
+    "type": "destroyEnemyFlagship",
+    "targetShipId": "e_flagship"
+  },
+  "ships": [
+    {
+      "instanceId": "p_flagship",
+      "dataId": "flagship",
+      "factionId": 0,
+      "position": [150, 300],
+      "heading": 0,
+      "commandNodeId": "pf_node",
+      "commandNodeType": "flagship"
+    },
+    {
+      "instanceId": "p_relay",
+      "dataId": "command_relay",
+      "factionId": 0,
+      "position": [220, 240],
+      "heading": 0,
+      "commandNodeId": "pr_node",
+      "commandNodeType": "relay",
+      "parentNodeId": "pf_node"
+    },
+    {
+      "instanceId": "p_heavy",
+      "dataId": "heavy_line",
+      "factionId": 0,
+      "position": [170, 360],
+      "heading": 0,
+      "assignedCommandNodeId": "pr_node"
+    },
+    {
+      "instanceId": "p_escort",
+      "dataId": "light_escort",
+      "factionId": 0,
+      "position": [200, 220],
+      "heading": 0,
+      "assignedCommandNodeId": "pr_node"
+    },
+    {
+      "instanceId": "e_flagship",
+      "dataId": "flagship",
+      "factionId": 1,
+      "position": [850, 300],
+      "heading": 3.14159,
+      "commandNodeId": "ef_node",
+      "commandNodeType": "flagship"
+    },
+    {
+      "instanceId": "e_relay",
+      "dataId": "command_relay",
+      "factionId": 1,
+      "position": [780, 360],
+      "heading": 3.14159,
+      "commandNodeId": "er_node",
+      "commandNodeType": "relay",
+      "parentNodeId": "ef_node"
+    },
+    {
+      "instanceId": "e_heavy",
+      "dataId": "heavy_line",
+      "factionId": 1,
+      "position": [830, 240],
+      "heading": 3.14159,
+      "assignedCommandNodeId": "er_node"
+    },
+    {
+      "instanceId": "e_raider",
+      "dataId": "fast_raider",
+      "factionId": 1,
+      "position": [760, 290],
+      "heading": 3.14159,
+      "assignedCommandNodeId": "er_node"
+    }
+  ]
+}
