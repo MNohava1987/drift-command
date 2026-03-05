@@ -21,6 +21,7 @@ class CommandSystem {
     Vector2? targetPosition,
     String? targetEnemyId,
     required Map<String, ShipData> registry,
+    double targetSpeedFraction = 0.5,
   }) {
     final target = state.ships[targetShipId];
     if (target == null || !target.isAlive) return;
@@ -45,6 +46,7 @@ class CommandSystem {
       arrivesAt: state.battleTime + delay,
       targetPosition: targetPosition,
       targetShipId: targetEnemyId,
+      targetSpeedFraction: targetSpeedFraction,
     );
 
     // Limit queued orders to 3 (MVP constraint)

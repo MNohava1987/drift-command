@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'game_screen.dart';
+import 'tutorial_screen.dart';
 
 /// Scenario metadata for the picker UI.
 class _ScenarioMeta {
@@ -70,6 +71,20 @@ class ScenarioPickerScreen extends StatelessWidget {
             ),
             const SizedBox(height: 40),
             ..._scenarios.map((s) => _ScenarioCard(meta: s)),
+            const SizedBox(height: 16),
+            GestureDetector(
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const TutorialScreen()),
+              ),
+              child: const Text(
+                'HOW TO PLAY',
+                style: TextStyle(
+                  color: Colors.white30,
+                  fontSize: 11,
+                  letterSpacing: 2,
+                ),
+              ),
+            ),
           ],
         ),
       ),

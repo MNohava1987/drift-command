@@ -17,7 +17,7 @@ import 'components/battlefield_renderer.dart';
 
 /// Root Flame game. Owns the simulation loop and exposes ValueNotifiers
 /// for Flutter HUD widgets.
-class BattleGame extends FlameGame with TapCallbacks {
+class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
   final String scenarioAssetPath;
 
   BattleGame({
@@ -36,6 +36,9 @@ class BattleGame extends FlameGame with TapCallbacks {
   bool _isInitialized = false;
   ShipState? _selectedShip;
   late BattlefieldRenderer _renderer;
+
+  /// Approach speed for the next issued order: 0.25 / 0.5 / 1.0
+  double selectedSpeed = 0.5;
 
   // ── HUD notifiers (listened to by Flutter widgets) ───────────────────────
   final tempoBandNotifier = ValueNotifier<TempoBand>(TempoBand.distant);
@@ -146,6 +149,7 @@ class BattleGame extends FlameGame with TapCallbacks {
         targetPosition: tappedEnemy.position.clone(),
         targetEnemyId: tappedEnemy.instanceId,
         registry: kShipDefinitions,
+        targetSpeedFraction: selectedSpeed,
       );
     } else {
       _commandSystem.issueOrder(
@@ -154,10 +158,18 @@ class BattleGame extends FlameGame with TapCallbacks {
         orderType: OrderType.moveTo,
         targetPosition: worldPos.clone(),
         registry: kShipDefinitions,
+        targetSpeedFraction: selectedSpeed,
       );
     }
     _tempoSystem.advanceCommandPulse(_state);
     commandPulseReadyNotifier.value = false;
+  }
+
+  @override
+  void onScroll(PointerScrollInfo info) {
+    if (!_isInitialized) return;
+    final delta = info.scrollDelta.global.y;
+    _renderer.adjustZoom(delta > 0 ? 0.9 : 1.1);
   }
 
   /// Issue a HOLD order to the selected ship (if pulse is ready).
@@ -170,6 +182,7 @@ class BattleGame extends FlameGame with TapCallbacks {
       targetShipId: _selectedShip!.instanceId,
       orderType: OrderType.hold,
       registry: kShipDefinitions,
+      targetSpeedFraction: selectedSpeed,
     );
     _tempoSystem.advanceCommandPulse(_state);
     commandPulseReadyNotifier.value = false;
@@ -190,6 +203,7 @@ class BattleGame extends FlameGame with TapCallbacks {
       orderType: OrderType.moveTo,
       targetPosition: flagship.position.clone(),
       registry: kShipDefinitions,
+      targetSpeedFraction: selectedSpeed,
     );
     _tempoSystem.advanceCommandPulse(_state);
     commandPulseReadyNotifier.value = false;

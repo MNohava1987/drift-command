@@ -100,6 +100,7 @@ class Order {
   final double arrivesAt;       // battle time when order reaches destination
   final Vector2? targetPosition;
   final String? targetShipId;
+  final double targetSpeedFraction; // 0.25 slow / 0.5 medium / 1.0 fast
 
   const Order({
     required this.type,
@@ -107,6 +108,7 @@ class Order {
     required this.arrivesAt,
     this.targetPosition,
     this.targetShipId,
+    this.targetSpeedFraction = 0.5,
   });
 
   bool isReady(double currentTime) => currentTime >= arrivesAt;

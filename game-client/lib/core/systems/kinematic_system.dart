@@ -2,8 +2,11 @@ import 'dart:math' as math;
 import 'package:flame/components.dart';
 import '../models/ship_data.dart';
 
-/// Handles all ship movement: applying thrust, turning commitment,
-/// and position integration.
+/// Handles all ship movement with true Newtonian momentum.
+///
+/// Ships have a velocity vector that persists between ticks. Thrust changes
+/// the vector gradually. Ships must begin braking early or they overshoot.
+/// Heavier ships change direction more slowly — speed is a commitment.
 ///
 /// This is pure Dart — no Flame or Flutter dependency. Fully unit-testable.
 class KinematicSystem {
@@ -11,10 +14,6 @@ class KinematicSystem {
 
   KinematicSystem({required this.shipDataRegistry});
 
-  /// Update all ship positions for one simulation step.
-  ///
-  /// [battleTime] is the current battle clock (used to promote pending orders).
-  /// [allShips] is the full ship map (used for attackTarget tracking).
   void update(
     List<ShipState> ships,
     double dt, {
@@ -27,11 +26,10 @@ class KinematicSystem {
       if (data == null) continue;
       _promoteReadyOrders(ship, battleTime);
       _executeActiveOrder(ship, data, dt, allShips);
-      _integratePosition(ship, dt);
+      ship.position += ship.velocity * dt;
     }
   }
 
-  /// Moves the first arrived pending order into [ship.activeOrder].
   void _promoteReadyOrders(ShipState ship, double battleTime) {
     if (ship.activeOrder != null) return;
     final idx = ship.pendingOrders.indexWhere((o) => o.isReady(battleTime));
@@ -41,7 +39,6 @@ class KinematicSystem {
     }
   }
 
-  /// Applies the currently active order to the ship for one tick.
   void _executeActiveOrder(
     ShipState ship,
     ShipData data,
@@ -49,52 +46,116 @@ class KinematicSystem {
     Map<String, ShipState> allShips,
   ) {
     final order = ship.activeOrder;
-    if (order == null) return;
+    if (order == null) {
+      // No order — coast (do not decelerate automatically)
+      return;
+    }
 
     switch (order.type) {
       case OrderType.moveTo:
-        if (order.targetPosition != null) {
-          final dist = ship.position.distanceTo(order.targetPosition!);
-          if (dist < 10.0) {
-            ship.activeOrder = null;
-            return;
-          }
-          _steerToward(ship, data, order.targetPosition!, dt);
-        }
+        final target = order.targetPosition;
+        if (target == null) return;
+        final arrived = _navigateTo(
+          ship, data, target, dt, order.targetSpeedFraction,
+          stopAtTarget: true,
+        );
+        if (arrived) ship.activeOrder = null;
+
       case OrderType.attackTarget:
-        final targetPos = (order.targetShipId != null
-                ? allShips[order.targetShipId]?.position
-                : null) ??
-            order.targetPosition;
-        if (targetPos != null) {
-          _steerToward(ship, data, targetPos, dt);
-        }
-      case OrderType.hold:
-        _decelerate(ship, data, dt);
-      case OrderType.retreat:
-        if (order.targetPosition != null) {
-          final dist = ship.position.distanceTo(order.targetPosition!);
-          if (dist < 10.0) {
-            ship.activeOrder = null;
-            return;
-          }
-          _steerToward(ship, data, order.targetPosition!, dt);
+        final enemy = order.targetShipId != null
+            ? allShips[order.targetShipId]
+            : null;
+        final enemyPos =
+            (enemy != null && enemy.isAlive) ? enemy.position : order.targetPosition;
+        if (enemyPos == null) return;
+
+        // Approach to 85% of weapon range, not to the ship center
+        final weaponRange = data.weaponRange;
+        final toEnemy = enemyPos - ship.position;
+        final distance = toEnemy.length;
+        if (distance < weaponRange * 0.85) {
+          // In range — hold position by braking
+          _applyBraking(ship, data, dt);
         } else {
-          _decelerate(ship, data, dt);
+          final engagePos =
+              enemyPos - toEnemy.normalized() * (weaponRange * 0.80);
+          _navigateTo(
+            ship, data, engagePos, dt, order.targetSpeedFraction,
+            stopAtTarget: true,
+          );
         }
+
+      case OrderType.hold:
+        _applyBraking(ship, data, dt);
+        // Order stays active — ship holds its stopped position
+
+      case OrderType.retreat:
+        final target = order.targetPosition;
+        if (target == null) {
+          _applyBraking(ship, data, dt);
+          return;
+        }
+        final arrived = _navigateTo(
+          ship, data, target, dt, order.targetSpeedFraction,
+          stopAtTarget: true,
+        );
+        if (arrived) ship.activeOrder = null;
+
       default:
         break;
     }
   }
 
+  /// Navigate toward [target]. Returns true when the ship has stopped at target.
+  /// [stopAtTarget] true = brake to a stop; false = fly through.
+  bool _navigateTo(
+    ShipState ship,
+    ShipData data,
+    Vector2 target,
+    double dt,
+    double speedFraction, {
+    required bool stopAtTarget,
+  }) {
+    final toTarget = target - ship.position;
+    final distance = toTarget.length;
+    final maxSpeed = _maxSpeedForClass(data.massClass) * speedFraction.clamp(0.1, 1.0);
+    final currentSpeed = ship.velocity.length;
+
+    // Arrived and stopped
+    if (distance < 8.0 && currentSpeed < 4.0) {
+      ship.velocity = Vector2.zero();
+      return true;
+    }
+
+    if (stopAtTarget) {
+      // Stopping distance: v² / (2a). Add 20% safety margin.
+      final stoppingDist =
+          (currentSpeed * currentSpeed) / (2 * data.maxAcceleration + 0.001);
+
+      if (distance <= stoppingDist * 1.2 || distance < 8.0) {
+        _applyBraking(ship, data, dt);
+        return false;
+      }
+    }
+
+    // Accelerate toward target, capped at maxSpeed
+    _steerToward(ship, data, target, dt, maxSpeed);
+    return false;
+  }
+
   void _steerToward(
-      ShipState ship, ShipData data, Vector2 target, double dt) {
+    ShipState ship,
+    ShipData data,
+    Vector2 target,
+    double dt,
+    double maxSpeed,
+  ) {
     final toTarget = target - ship.position;
     if (toTarget.length < 1.0) return;
 
+    // Rotate heading toward desired direction (turn rate limited)
     final desiredHeading = math.atan2(toTarget.y, toTarget.x);
     final headingDelta = _normalizeAngle(desiredHeading - ship.heading);
-
     final maxTurn = data.turnRate * dt;
     if (headingDelta.abs() > maxTurn) {
       ship.heading += maxTurn * headingDelta.sign;
@@ -102,39 +163,33 @@ class KinematicSystem {
       ship.heading = desiredHeading;
     }
 
-    final thrustDir = Vector2(
-      math.cos(ship.heading),
-      math.sin(ship.heading),
-    );
-
+    // Apply thrust in current heading direction
+    final thrustDir = Vector2(math.cos(ship.heading), math.sin(ship.heading));
     ship.velocity += thrustDir * data.maxAcceleration * dt;
 
-    final maxSpeed = _maxSpeedForClass(data.massClass);
+    // Cap to maxSpeed
     if (ship.velocity.length > maxSpeed) {
       ship.velocity = ship.velocity.normalized() * maxSpeed;
     }
   }
 
-  void _decelerate(ShipState ship, ShipData data, double dt) {
-    final decelRate = data.maxAcceleration * 0.5 * dt;
-    if (ship.velocity.length <= decelRate) {
+  void _applyBraking(ShipState ship, ShipData data, double dt) {
+    final speed = ship.velocity.length;
+    final brakeForce = data.maxAcceleration * dt;
+    if (speed <= brakeForce) {
       ship.velocity = Vector2.zero();
     } else {
-      ship.velocity -= ship.velocity.normalized() * decelRate;
+      ship.velocity -= ship.velocity.normalized() * brakeForce;
     }
-  }
-
-  void _integratePosition(ShipState ship, double dt) {
-    ship.position += ship.velocity * dt;
+    // Face braking direction
+    if (ship.velocity.length > 0.5) {
+      ship.heading = math.atan2(ship.velocity.y, ship.velocity.x);
+    }
   }
 
   double _normalizeAngle(double angle) {
-    while (angle > math.pi) {
-      angle -= 2 * math.pi;
-    }
-    while (angle < -math.pi) {
-      angle += 2 * math.pi;
-    }
+    while (angle > math.pi) { angle -= 2 * math.pi; }
+    while (angle < -math.pi) { angle += 2 * math.pi; }
     return angle;
   }
 

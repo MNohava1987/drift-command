@@ -125,6 +125,8 @@ class _ActionBar extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
+                  _SpeedSelector(game: game),
+                  const SizedBox(width: 16),
                   _CommandButton(
                     label: 'HOLD',
                     enabled: pulseReady,
@@ -144,6 +146,59 @@ class _ActionBar extends StatelessWidget {
           },
         );
       },
+    );
+  }
+}
+
+class _SpeedSelector extends StatefulWidget {
+  final BattleGame game;
+  const _SpeedSelector({required this.game});
+  @override
+  State<_SpeedSelector> createState() => _SpeedSelectorState();
+}
+
+class _SpeedSelectorState extends State<_SpeedSelector> {
+  static const _speeds = [
+    (label: 'SLOW', value: 0.25),
+    (label: 'MED', value: 0.5),
+    (label: 'FAST', value: 1.0),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = widget.game.selectedSpeed;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: _speeds.map((s) {
+        final isSelected = selected == s.value;
+        return GestureDetector(
+          onTap: () => setState(() => widget.game.selectedSpeed = s.value),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            margin: const EdgeInsets.only(right: 4),
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: isSelected
+                    ? const Color(0xFF4A90D9)
+                    : Colors.white24,
+              ),
+              borderRadius: BorderRadius.circular(4),
+              color: isSelected
+                  ? const Color(0xFF4A90D9).withAlpha(60)
+                  : Colors.transparent,
+            ),
+            child: Text(
+              s.label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : Colors.white38,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.8,
+              ),
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 }
