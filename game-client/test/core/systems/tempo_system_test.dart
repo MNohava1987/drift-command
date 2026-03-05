@@ -98,4 +98,62 @@ void main() {
     system.update(state, 1.0);
     expect(state.battleTime, closeTo(1.0, 0.001));
   });
+
+  test('command pulse is ready at t=0 (nextCommandPulse starts at 0)', () {
+    final state = _makeBattleState(
+      playerPos: Vector2(0, 0),
+      enemyPos: Vector2(1000, 0),
+    );
+    final system = TempoSystem();
+    expect(system.isCommandPulseReady(state), isTrue);
+  });
+
+  test('advanceCommandPulse closes the window', () {
+    final state = _makeBattleState(
+      playerPos: Vector2(0, 0),
+      enemyPos: Vector2(1000, 0),
+    );
+    final system = TempoSystem();
+    system.update(state, 0.016);
+    expect(system.isCommandPulseReady(state), isTrue);
+
+    system.advanceCommandPulse(state);
+    expect(system.isCommandPulseReady(state), isFalse);
+  });
+
+  test('pulse re-opens after band duration elapses', () {
+    final state = _makeBattleState(
+      playerPos: Vector2(0, 0),
+      enemyPos: Vector2(1000, 0), // distant band: 15s pulse
+    );
+    final system = TempoSystem();
+    system.update(state, 0.016);
+    system.advanceCommandPulse(state); // close window
+
+    // Advance less than pulse duration — still closed
+    system.update(state, 10.0);
+    expect(system.isCommandPulseReady(state), isFalse);
+
+    // Advance past pulse duration — now open
+    system.update(state, 6.0);
+    expect(system.isCommandPulseReady(state), isTrue);
+  });
+
+  test('band change resets pulse immediately', () {
+    final state = _makeBattleState(
+      playerPos: Vector2(0, 0),
+      enemyPos: Vector2(1000, 0),
+    );
+    final system = TempoSystem();
+    system.update(state, 0.016);
+    system.advanceCommandPulse(state); // close window
+
+    // Move ships close — band changes to engaged
+    state.ships['p1']!.position = Vector2(0, 0);
+    state.ships['e1']!.position = Vector2(50, 0);
+    system.update(state, 0.016);
+
+    // Band change should have reset nextCommandPulse to current time
+    expect(system.isCommandPulseReady(state), isTrue);
+  });
 }

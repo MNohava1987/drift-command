@@ -17,6 +17,7 @@ class HudOverlay extends StatelessWidget {
       children: [
         _TopBar(game: game),
         const Spacer(),
+        _ActionBar(game: game),
         _ShipInfoBar(game: game),
       ],
     );
@@ -98,6 +99,130 @@ class _TempoPill extends StatelessWidget {
   }
 }
 
+// ── Action bar ────────────────────────────────────────────────────────────────
+
+class _ActionBar extends StatelessWidget {
+  final BattleGame game;
+
+  const _ActionBar({required this.game});
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<ShipState?>(
+      valueListenable: game.selectedShipNotifier,
+      builder: (_, ship, _) {
+        final state = game.battleStateOrNull;
+        if (ship == null || state == null) return const SizedBox.shrink();
+        if (ship.factionId != state.playerFactionId) {
+          return const SizedBox.shrink();
+        }
+        return ValueListenableBuilder<bool>(
+          valueListenable: game.commandPulseReadyNotifier,
+          builder: (_, pulseReady, _) {
+            return Container(
+              color: Colors.black.withAlpha(140),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  _CommandButton(
+                    label: 'HOLD',
+                    enabled: pulseReady,
+                    onPressed: game.issueHold,
+                  ),
+                  const SizedBox(width: 8),
+                  _CommandButton(
+                    label: 'RETREAT',
+                    enabled: pulseReady,
+                    onPressed: game.issueRetreat,
+                  ),
+                  const SizedBox(width: 12),
+                  _PulseIndicator(ready: pulseReady),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _CommandButton extends StatelessWidget {
+  final String label;
+  final bool enabled;
+  final VoidCallback onPressed;
+
+  const _CommandButton({
+    required this.label,
+    required this.enabled,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: enabled ? onPressed : null,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: enabled
+                ? const Color(0xFF4A90D9)
+                : Colors.white24,
+          ),
+          borderRadius: BorderRadius.circular(4),
+          color: enabled
+              ? const Color(0xFF4A90D9).withAlpha(40)
+              : Colors.transparent,
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: enabled ? Colors.white : Colors.white30,
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.0,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PulseIndicator extends StatelessWidget {
+  final bool ready;
+
+  const _PulseIndicator({required this.ready});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 7,
+          height: 7,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: ready ? Colors.greenAccent : Colors.white24,
+          ),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          ready ? 'CMD READY' : 'CMD WAIT',
+          style: TextStyle(
+            color: ready ? Colors.greenAccent : Colors.white30,
+            fontSize: 9,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.8,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 // ── Ship info bar ─────────────────────────────────────────────────────────────
 
 class _ShipInfoBar extends StatelessWidget {
@@ -131,7 +256,11 @@ class _ShipPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final topology = state.topologies[ship.factionId];
     final isConnected = topology != null
-        ? topology.isConnected(ship.instanceId, state.aliveMap)
+        ? topology.isConnected(
+            ship.instanceId,
+            state.aliveMap,
+            assignedCommandNodeId: ship.assignedCommandNodeId,
+          )
         : false;
 
     return Container(

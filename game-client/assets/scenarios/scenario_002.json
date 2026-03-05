@@ -1,0 +1,105 @@
+{
+  "id": "scenario_002",
+  "name": "Relay Hunt",
+  "objective": "Destroy all enemy ships",
+  "playerFactionId": 0,
+  "winCondition": {
+    "type": "destroyAllEnemies"
+  },
+  "ships": [
+    {
+      "instanceId": "p_flagship",
+      "dataId": "flagship",
+      "factionId": 0,
+      "position": [130, 300],
+      "heading": 0,
+      "commandNodeId": "pf_node",
+      "commandNodeType": "flagship"
+    },
+    {
+      "instanceId": "p_relay",
+      "dataId": "command_relay",
+      "factionId": 0,
+      "position": [200, 270],
+      "heading": 0,
+      "commandNodeId": "pr_node",
+      "commandNodeType": "relay",
+      "parentNodeId": "pf_node"
+    },
+    {
+      "instanceId": "p_heavy",
+      "dataId": "heavy_line",
+      "factionId": 0,
+      "position": [175, 340],
+      "heading": 0,
+      "assignedCommandNodeId": "pr_node"
+    },
+    {
+      "instanceId": "e_flagship",
+      "dataId": "flagship",
+      "factionId": 1,
+      "position": [870, 300],
+      "heading": 3.14159,
+      "commandNodeId": "ef_node",
+      "commandNodeType": "flagship"
+    },
+    {
+      "instanceId": "e_relay",
+      "dataId": "command_relay",
+      "factionId": 1,
+      "position": [800, 250],
+      "heading": 3.14159,
+      "commandNodeId": "er_node",
+      "commandNodeType": "relay",
+      "parentNodeId": "ef_node"
+    },
+    {
+      "instanceId": "e_heavy_1",
+      "dataId": "heavy_line",
+      "factionId": 1,
+      "position": [820, 370],
+      "heading": 3.14159,
+      "assignedCommandNodeId": "ef_node"
+    },
+    {
+      "instanceId": "e_heavy_2",
+      "dataId": "heavy_line",
+      "factionId": 1,
+      "position": [760, 310],
+      "heading": 3.14159,
+      "assignedCommandNodeId": "er_node"
+    },
+    {
+      "instanceId": "e_escort_1",
+      "dataId": "light_escort",
+      "factionId": 1,
+      "position": [840, 200],
+      "heading": 3.14159,
+      "assignedCommandNodeId": "er_node"
+    },
+    {
+      "instanceId": "e_escort_2",
+      "dataId": "light_escort",
+      "factionId": 1,
+      "position": [790, 430],
+      "heading": 3.14159,
+      "assignedCommandNodeId": "er_node"
+    },
+    {
+      "instanceId": "e_raider_1",
+      "dataId": "fast_raider",
+      "factionId": 1,
+      "position": [720, 270],
+      "heading": 3.14159,
+      "assignedCommandNodeId": "ef_node"
+    },
+    {
+      "instanceId": "e_raider_2",
+      "dataId": "fast_raider",
+      "factionId": 1,
+      "position": [730, 380],
+      "heading": 3.14159,
+      "assignedCommandNodeId": "ef_node"
+    }
+  ]
+}

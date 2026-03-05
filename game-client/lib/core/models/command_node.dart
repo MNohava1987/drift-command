@@ -43,13 +43,24 @@ class CommandTopology {
 
   CommandNode get flagship => nodes[flagshipNodeId]!;
 
-  bool isConnected(String shipInstanceId, Map<String, bool> aliveShips) {
+  bool isConnected(
+    String shipInstanceId,
+    Map<String, bool> aliveShips, {
+    String? assignedCommandNodeId,
+  }) {
     // Walk from the ship's node up to the flagship.
     // If any node along the path is destroyed, the ship is disconnected.
     for (final node in nodes.values) {
       if (node.shipInstanceId == shipInstanceId) {
         return _pathToRootAlive(node, aliveShips);
       }
+    }
+    // Leaf combat ships are not command nodes themselves — check via their
+    // assigned command node (flagship or relay they report to).
+    if (assignedCommandNodeId != null) {
+      final assignedNode = nodes[assignedCommandNodeId];
+      if (assignedNode == null) return false;
+      return _pathToRootAlive(assignedNode, aliveShips);
     }
     return false;
   }

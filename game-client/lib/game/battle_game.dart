@@ -18,6 +18,12 @@ import 'components/battlefield_renderer.dart';
 /// Root Flame game. Owns the simulation loop and exposes ValueNotifiers
 /// for Flutter HUD widgets.
 class BattleGame extends FlameGame with TapCallbacks {
+  final String scenarioAssetPath;
+
+  BattleGame({
+    this.scenarioAssetPath = 'assets/scenarios/scenario_001.json',
+  });
+
   // ── Systems ──────────────────────────────────────────────────────────────
   final _tempoSystem = TempoSystem();
   final _commandSystem = CommandSystem();
@@ -36,6 +42,7 @@ class BattleGame extends FlameGame with TapCallbacks {
   final selectedShipNotifier = ValueNotifier<ShipState?>(null);
   final battlePhaseNotifier = ValueNotifier<BattlePhase>(BattlePhase.setup);
   final battleTimeTextNotifier = ValueNotifier<String>('0:00');
+  final commandPulseReadyNotifier = ValueNotifier<bool>(false);
 
   // ── Public accessors ─────────────────────────────────────────────────────
   BattleState get battleState => _state;
@@ -48,8 +55,7 @@ class BattleGame extends FlameGame with TapCallbacks {
     _combat = CombatSystem(shipDataRegistry: kShipDefinitions);
     _ai = DoctrineAI(commandSystem: _commandSystem, registry: kShipDefinitions);
 
-    final jsonStr = await rootBundle
-        .loadString('assets/scenarios/scenario_001.json');
+    final jsonStr = await rootBundle.loadString(scenarioAssetPath);
     final jsonMap = jsonDecode(jsonStr) as Map<String, dynamic>;
     _state = ScenarioLoader.fromJson(jsonMap, kShipDefinitions);
 
@@ -84,6 +90,7 @@ class BattleGame extends FlameGame with TapCallbacks {
 
     // Refresh HUD notifiers
     tempoBandNotifier.value = _state.tempoBand;
+    commandPulseReadyNotifier.value = _tempoSystem.isCommandPulseReady(_state);
     final t = _state.battleTime.toInt();
     battleTimeTextNotifier.value =
         '${t ~/ 60}:${(t % 60).toString().padLeft(2, '0')}';
@@ -117,6 +124,7 @@ class BattleGame extends FlameGame with TapCallbacks {
 
     // No player ship tapped — issue order to selected ship
     if (_selectedShip == null || !_selectedShip!.isAlive) return;
+    if (!_tempoSystem.isCommandPulseReady(_state)) return;
 
     // Check if tapping an enemy ship → attack order
     ShipState? tappedEnemy;
@@ -148,6 +156,43 @@ class BattleGame extends FlameGame with TapCallbacks {
         registry: kShipDefinitions,
       );
     }
+    _tempoSystem.advanceCommandPulse(_state);
+    commandPulseReadyNotifier.value = false;
+  }
+
+  /// Issue a HOLD order to the selected ship (if pulse is ready).
+  void issueHold() {
+    if (!_isInitialized || _state.phase != BattlePhase.active) return;
+    if (_selectedShip == null || !_selectedShip!.isAlive) return;
+    if (!_tempoSystem.isCommandPulseReady(_state)) return;
+    _commandSystem.issueOrder(
+      state: _state,
+      targetShipId: _selectedShip!.instanceId,
+      orderType: OrderType.hold,
+      registry: kShipDefinitions,
+    );
+    _tempoSystem.advanceCommandPulse(_state);
+    commandPulseReadyNotifier.value = false;
+  }
+
+  /// Issue a RETREAT order (move to own flagship position) to the selected ship.
+  void issueRetreat() {
+    if (!_isInitialized || _state.phase != BattlePhase.active) return;
+    if (_selectedShip == null || !_selectedShip!.isAlive) return;
+    if (!_tempoSystem.isCommandPulseReady(_state)) return;
+    final playerTopology = _state.topologies[_state.playerFactionId];
+    if (playerTopology == null) return;
+    final flagship = _state.ships[playerTopology.flagship.shipInstanceId];
+    if (flagship == null || !flagship.isAlive) return;
+    _commandSystem.issueOrder(
+      state: _state,
+      targetShipId: _selectedShip!.instanceId,
+      orderType: OrderType.moveTo,
+      targetPosition: flagship.position.clone(),
+      registry: kShipDefinitions,
+    );
+    _tempoSystem.advanceCommandPulse(_state);
+    commandPulseReadyNotifier.value = false;
   }
 
   void _checkWinLoss() {

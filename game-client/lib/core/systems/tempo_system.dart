@@ -22,13 +22,16 @@ class TempoSystem {
     final newBand = _evaluateBand(state);
     if (newBand != state.tempoBand) {
       state.tempoBand = newBand;
+      // Band change resets the pulse so the new window opens immediately
+      state.nextCommandPulse = state.battleTime;
     }
+  }
 
-    // Advance the pulse clock
-    if (state.battleTime >= state.nextCommandPulse) {
-      state.nextCommandPulse =
-          state.battleTime + kPulseDuration[state.tempoBand]!;
-    }
+  /// Called by [BattleGame] after the player successfully issues an order.
+  /// Closes the current window and schedules the next one.
+  void advanceCommandPulse(BattleState state) {
+    state.nextCommandPulse =
+        state.battleTime + kPulseDuration[state.tempoBand]!;
   }
 
   TempoBand _evaluateBand(BattleState state) {

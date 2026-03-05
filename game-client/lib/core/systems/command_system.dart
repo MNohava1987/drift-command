@@ -80,9 +80,11 @@ class CommandSystem {
     final relay = ships[relayNode.shipInstanceId];
     if (relay == null || !relay.isAlive) {
       // Relay is dead — check if unit is connected at all
-      final connected = topology.isConnected(target.instanceId, {
-        for (final s in ships.values) s.instanceId: s.isAlive,
-      });
+      final connected = topology.isConnected(
+        target.instanceId,
+        {for (final s in ships.values) s.instanceId: s.isAlive},
+        assignedCommandNodeId: target.assignedCommandNodeId,
+      );
       if (!connected) return double.infinity; // order never arrives
       // Fall back to direct flagship→target
       final dist = flagship.position.distanceTo(target.position);
@@ -106,9 +108,15 @@ class CommandSystem {
         if (!ship.isAlive) continue;
         if (ship.factionId != faction.factionId) continue;
 
-        final connected = faction.isConnected(ship.instanceId, aliveMap);
-        if (!connected && ship.pendingOrders.isNotEmpty) {
+        final connected = faction.isConnected(
+          ship.instanceId,
+          aliveMap,
+          assignedCommandNodeId: ship.assignedCommandNodeId,
+        );
+        if (!connected &&
+            (ship.pendingOrders.isNotEmpty || ship.activeOrder != null)) {
           ship.pendingOrders.clear();
+          ship.activeOrder = null;
           // doctrine holds, ship will behave per activeDoctrine
         }
       }
