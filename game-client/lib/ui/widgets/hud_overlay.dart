@@ -2,23 +2,50 @@ import 'package:flutter/material.dart';
 
 import '../../core/models/battle_state.dart';
 import '../../core/models/ship_data.dart';
+import '../../data/ships/ship_definitions.dart';
 import '../../game/battle_game.dart';
 
 /// In-game HUD rendered over the Flame canvas via FlameGame overlays.
 class HudOverlay extends StatelessWidget {
   final BattleGame game;
 
-  const HudOverlay({super.key, required this.game});
+  /// Called when the player taps RESTART in the pause menu.
+  final VoidCallback onRestart;
+
+  /// Called when the player taps BACK TO MENU in the pause menu.
+  final VoidCallback onBackToMenu;
+
+  const HudOverlay({
+    super.key,
+    required this.game,
+    required this.onRestart,
+    required this.onBackToMenu,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Stack(
       children: [
-        _TopBar(game: game),
-        const Spacer(),
-        _ActionBar(game: game),
-        _ShipInfoBar(game: game),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _TopBar(game: game),
+            const Spacer(),
+            _ActionBar(game: game),
+            _ShipInfoBar(game: game),
+          ],
+        ),
+        ValueListenableBuilder<bool>(
+          valueListenable: game.isPausedNotifier,
+          builder: (_, paused, _) {
+            if (!paused) return const SizedBox.shrink();
+            return _PauseMenu(
+              onResume: game.togglePause,
+              onRestart: onRestart,
+              onBackToMenu: onBackToMenu,
+            );
+          },
+        ),
       ],
     );
   }
@@ -393,16 +420,7 @@ class _DurabilityBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Approximate max durability from ship data or fallback
-    const maxDurs = <String, double>{
-      'flagship': 200.0,
-      'command_relay': 80.0,
-      'heavy_line': 120.0,
-      'light_escort': 50.0,
-      'strike_carrier': 90.0,
-      'fast_raider': 40.0,
-    };
-    final maxDur = maxDurs[ship.dataId] ?? 100.0;
+    final maxDur = kShipDefinitions[ship.dataId]?.maxDurability ?? 100.0;
     final frac = (ship.durability / maxDur).clamp(0.0, 1.0);
     final barColor = frac > 0.5
         ? Colors.greenAccent
@@ -462,6 +480,80 @@ class _RelayStatus extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ── Pause menu ────────────────────────────────────────────────────────────────
+
+class _PauseMenu extends StatelessWidget {
+  final VoidCallback onResume;
+  final VoidCallback onRestart;
+  final VoidCallback onBackToMenu;
+
+  const _PauseMenu({
+    required this.onResume,
+    required this.onRestart,
+    required this.onBackToMenu,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: Colors.black.withAlpha(180),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'PAUSED',
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 6,
+              ),
+            ),
+            const SizedBox(height: 36),
+            _PauseMenuButton(label: 'RESUME', onPressed: onResume),
+            const SizedBox(height: 12),
+            _PauseMenuButton(label: 'RESTART', onPressed: onRestart),
+            const SizedBox(height: 12),
+            _PauseMenuButton(label: 'BACK TO MENU', onPressed: onBackToMenu),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PauseMenuButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onPressed;
+
+  const _PauseMenuButton({required this.label, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 10),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.white24),
+          borderRadius: BorderRadius.circular(4),
+          color: Colors.white.withAlpha(10),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 2,
+          ),
+        ),
+      ),
     );
   }
 }

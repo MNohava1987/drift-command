@@ -19,21 +19,6 @@ provider "google" {
   region  = var.region
 }
 
-variable "project_id" {
-  type        = string
-  description = "GCP project ID"
-}
-
-variable "region" {
-  type    = string
-  default = "us-central1"
-}
-
-variable "github_repo" {
-  type    = string
-  default = "MNohava1987/drift-command"
-}
-
 module "service_accounts" {
   source     = "../../modules/service_accounts"
   project_id = var.project_id
@@ -46,11 +31,13 @@ module "artifact_registry" {
   repository_id = "drift-command-dev"
 }
 
+# Public read: game client fetches scenario/config JSON from this bucket.
+# Only GET is public — writes require the github-actions-sa.
 module "config_bucket" {
-  source       = "../../modules/storage_bucket"
-  project_id   = var.project_id
-  bucket_name  = "${var.project_id}-drift-command-config-dev"
-  public_read  = true
+  source      = "../../modules/storage_bucket"
+  project_id  = var.project_id
+  bucket_name = "${var.project_id}-drift-command-config-dev"
+  public_read = true
 }
 
 module "tfstate_bucket" {
@@ -69,20 +56,11 @@ module "wif_github" {
   depends_on = [module.service_accounts]
 }
 
-# Give github-actions-sa full object-level access to the tfstate bucket
-# so Terraform init/plan/apply can read, write, and delete the state lock.
+# Bucket-scoped objectAdmin for Terraform state — narrower than project-level storage.admin.
 resource "google_storage_bucket_iam_member" "github_actions_tfstate" {
   bucket = module.tfstate_bucket.bucket_name
   role   = "roles/storage.objectAdmin"
   member = "serviceAccount:${module.service_accounts.github_actions_sa_email}"
 
   depends_on = [module.service_accounts, module.tfstate_bucket]
-}
-
-output "artifact_registry_url" {
-  value = module.artifact_registry.repository_url
-}
-
-output "workload_identity_provider" {
-  value = module.wif_github.workload_identity_provider
 }

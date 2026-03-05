@@ -13,7 +13,14 @@ class DoctrineAI {
   final math.Random _rng;
 
   double _nextAIUpdate = 0;
-  static const double _aiUpdateInterval = 3.0; // AI re-evaluates every 3 seconds
+
+  // AI re-evaluation interval mirrors the tempo band pulse windows so the enemy
+  // faces the same command pacing as the player (distant=15s, contact=7s, engaged=3s).
+  static const Map<TempoBand, double> _aiInterval = {
+    TempoBand.distant: 15.0,
+    TempoBand.contact: 7.0,
+    TempoBand.engaged: 3.0,
+  };
 
   DoctrineAI({
     required this.commandSystem,
@@ -23,7 +30,7 @@ class DoctrineAI {
 
   void update(BattleState state, double dt) {
     if (state.battleTime < _nextAIUpdate) return;
-    _nextAIUpdate = state.battleTime + _aiUpdateInterval;
+    _nextAIUpdate = state.battleTime + (_aiInterval[state.tempoBand] ?? 3.0);
 
     for (final factionId in state.topologies.keys) {
       if (factionId == state.playerFactionId) continue;
@@ -120,8 +127,9 @@ class DoctrineAI {
   }
 
   bool _isThreatened(ShipState ship, BattleState state) {
-    return state.enemyShips.any((e) =>
-        e.isAlive && e.position.distanceTo(ship.position) < 120);
+    // Check whether any player ship is within threat range of this (enemy) ship.
+    return state.playerShips.any((p) =>
+        p.isAlive && p.position.distanceTo(ship.position) < 120);
   }
 
   Vector2 _nearestPlayerPosition(ShipState from, List<ShipState> players) {

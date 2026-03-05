@@ -28,21 +28,39 @@ class _GameScreenState extends State<GameScreen> {
     _game = BattleGame(scenarioAssetPath: widget.scenarioAssetPath);
   }
 
+  void _restart(BuildContext context) {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => GameScreen(scenarioAssetPath: widget.scenarioAssetPath),
+      ),
+    );
+  }
+
+  void _backToMenu(BuildContext context) {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const ScenarioPickerScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return GameWidget<BattleGame>(
       game: _game,
       overlayBuilderMap: {
-        'hud': (_, game) => HudOverlay(game: game),
-        'win': (context, game) => _EndScreen(
+        'hud': (context, game) => HudOverlay(
+              game: game,
+              onRestart: () => _restart(context),
+              onBackToMenu: () => _backToMenu(context),
+            ),
+        'win': (context, _) => _EndScreen(
               message: 'VICTORY',
               color: const Color(0xFF4A90D9),
-              context: context,
+              onBackToMenu: () => _backToMenu(context),
             ),
-        'lose': (context, game) => _EndScreen(
+        'lose': (context, _) => _EndScreen(
               message: 'DEFEATED',
               color: const Color(0xFFD94A4A),
-              context: context,
+              onBackToMenu: () => _backToMenu(context),
             ),
       },
     );
@@ -54,12 +72,12 @@ class _GameScreenState extends State<GameScreen> {
 class _EndScreen extends StatelessWidget {
   final String message;
   final Color color;
-  final BuildContext context;
+  final VoidCallback onBackToMenu;
 
   const _EndScreen({
     required this.message,
     required this.color,
-    required this.context,
+    required this.onBackToMenu,
   });
 
   @override
@@ -81,11 +99,7 @@ class _EndScreen extends StatelessWidget {
             ),
             const SizedBox(height: 32),
             GestureDetector(
-              onTap: () => Navigator.of(context).pushReplacement(
-                MaterialPageRoute(
-                  builder: (_) => const ScenarioPickerScreen(),
-                ),
-              ),
+              onTap: onBackToMenu,
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 24,

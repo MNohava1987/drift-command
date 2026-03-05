@@ -49,9 +49,9 @@ class CommandSystem {
       targetSpeedFraction: targetSpeedFraction,
     );
 
-    // Limit queued orders to 3 (MVP constraint)
+    // Cap the queue at 3 pending orders; drop the oldest to preserve the newest intent.
     if (target.pendingOrders.length >= 3) {
-      target.pendingOrders.removeLast();
+      target.pendingOrders.removeAt(0);
     }
     target.pendingOrders.add(order);
   }
