@@ -153,12 +153,13 @@ class _TutorialScreenState extends State<TutorialScreen> {
             ),
 
             Expanded(
-              child: Padding(
+              child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 40),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    const SizedBox(height: 16),
                     Text(
                       step.title.toUpperCase(),
                       style: const TextStyle(
@@ -177,7 +178,7 @@ class _TutorialScreenState extends State<TutorialScreen> {
                         height: 1.6,
                       ),
                     ),
-                    const SizedBox(height: 28),
+                    const SizedBox(height: 20),
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(16),
