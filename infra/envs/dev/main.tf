@@ -8,11 +8,10 @@ terraform {
     }
   }
 
-  # Uncomment and configure when you have a GCP project:
-  # backend "gcs" {
-  #   bucket = "drift-command-tfstate-dev"
-  #   prefix = "terraform/state"
-  # }
+  backend "gcs" {
+    bucket = "drift-command-drift-command-tfstate-dev"
+    prefix = "terraform/state"
+  }
 }
 
 provider "google" {
@@ -68,6 +67,16 @@ module "wif_github" {
   service_account_email = module.service_accounts.github_actions_sa_email
 
   depends_on = [module.service_accounts]
+}
+
+# Give github-actions-sa full object-level access to the tfstate bucket
+# so Terraform init/plan/apply can read, write, and delete the state lock.
+resource "google_storage_bucket_iam_member" "github_actions_tfstate" {
+  bucket = module.tfstate_bucket.bucket_name
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${module.service_accounts.github_actions_sa_email}"
+
+  depends_on = [module.service_accounts, module.tfstate_bucket]
 }
 
 output "artifact_registry_url" {
