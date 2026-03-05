@@ -79,26 +79,30 @@ class CommandSystem {
       return dist / kBasePropagationSpeed;
     }
 
+    final targetData = registry[target.dataId];
+    final latencyMod = targetData?.commandLatencyMod ?? 1.0;
+    final directDist = flagship.position.distanceTo(target.position);
+    final directDelay = (directDist / kBasePropagationSpeed) * latencyMod;
+
     final relay = ships[relayNode.shipInstanceId];
     if (relay == null || !relay.isAlive) {
-      // Relay is dead — check if unit is connected at all
+      // Relay dead — check connectivity, fall back to direct
       final connected = topology.isConnected(
         target.instanceId,
         {for (final s in ships.values) s.instanceId: s.isAlive},
         assignedCommandNodeId: target.assignedCommandNodeId,
       );
-      if (!connected) return double.infinity; // order never arrives
-      // Fall back to direct flagship→target
-      final dist = flagship.position.distanceTo(target.position);
-      return dist / kBasePropagationSpeed;
+      if (!connected) return double.infinity;
+      return directDelay;
     }
 
-    // flagship → relay + relay → target
+    // Compare direct vs relay path — use whichever is shorter.
+    // Ships close to the flagship skip the relay entirely.
     final flagToRelay = flagship.position.distanceTo(relay.position);
     final relayToTarget = relay.position.distanceTo(target.position);
-    final targetData = registry[target.dataId];
-    final latencyMod = targetData?.commandLatencyMod ?? 1.0;
-    return ((flagToRelay + relayToTarget) / kBasePropagationSpeed) * latencyMod;
+    final relayDelay = ((flagToRelay + relayToTarget) / kBasePropagationSpeed) * latencyMod;
+
+    return directDelay < relayDelay ? directDelay : relayDelay;
   }
 
   /// Remove pending orders from disconnected ships and apply their doctrine.

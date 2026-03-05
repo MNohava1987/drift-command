@@ -275,6 +275,19 @@ class BattlefieldRenderer extends Component {
 
     canvas.drawCircle(co, radius, Paint()..color = color);
 
+    // Order-arrived flash ring
+    if (state.battleTime < ship.orderFlashUntil) {
+      final fade = ((ship.orderFlashUntil - state.battleTime) / 0.45).clamp(0.0, 1.0);
+      canvas.drawCircle(
+        co,
+        radius + 8,
+        Paint()
+          ..color = const Color(0xFF00FFFF).withAlpha((fade * 220).toInt())
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.0,
+      );
+    }
+
     // Ship type label
     _drawShipLabel(canvas, _labelForRole(role), co, radius,
         ship.factionId == state.playerFactionId);

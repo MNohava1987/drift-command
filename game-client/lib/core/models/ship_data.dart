@@ -76,6 +76,7 @@ class ShipState {
   List<Order> pendingOrders;
   Order? activeOrder;              // order currently being executed
   Doctrine activeDoctrine;
+  double orderFlashUntil;          // battle time until which to draw "order arrived" ring
 
   ShipState({
     required this.instanceId,
@@ -89,7 +90,8 @@ class ShipState {
     this.activeDoctrine = Doctrine.hold,
   })  : velocity = Vector2.zero(),
         isAlive = true,
-        pendingOrders = pendingOrders ?? [];
+        pendingOrders = pendingOrders ?? [],
+        orderFlashUntil = -1.0;
 }
 
 /// An order issued to a ship, carrying the time it was created and

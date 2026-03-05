@@ -36,6 +36,7 @@ class KinematicSystem {
     if (idx >= 0) {
       ship.activeOrder = ship.pendingOrders[idx];
       ship.pendingOrders.removeAt(idx);
+      ship.orderFlashUntil = battleTime + 0.45; // flash ring for 0.45 s on arrival
     }
   }
 

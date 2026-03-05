@@ -174,7 +174,8 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
     _spawnOrderPulse(_selectedShip!);
   }
 
-  /// Spawns a visual pulse traveling from flagship → relay → target ship.
+  /// Spawns a visual pulse along whichever path the order actually took
+  /// (direct flagship→target if shorter, or flagship→relay→target if relay saves distance).
   void _spawnOrderPulse(ShipState target) {
     final topology = _state.topologies[_state.playerFactionId];
     if (topology == null) return;
@@ -185,22 +186,27 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
     final relayNode = relayNodeId != null ? topology.nodes[relayNodeId] : null;
     final relay = relayNode != null ? _state.ships[relayNode.shipInstanceId] : null;
 
+    final directDist = flagship.position.distanceTo(target.position);
+
     if (relay != null && relay.isAlive && relay.instanceId != flagship.instanceId) {
-      // Two-leg pulse: flagship → relay → target
-      final leg1Dist = flagship.position.distanceTo(relay.position);
-      final leg2Dist = relay.position.distanceTo(target.position);
-      final leg1Duration = (leg1Dist / 20.0).clamp(0.5, 8.0);
-      final leg2Duration = (leg2Dist / 20.0).clamp(0.3, 6.0);
-      spawnTransitPulse(flagship.position, relay.position, leg1Duration);
-      // Leg 2 starts after leg 1 — approximate by scheduling slightly offset
-      // (for MVP, spawn both immediately; renderer shows both)
-      spawnTransitPulse(relay.position, target.position, leg2Duration);
-    } else {
-      // Direct flagship → target
-      final dist = flagship.position.distanceTo(target.position);
-      final duration = (dist / 20.0).clamp(0.5, 10.0);
-      spawnTransitPulse(flagship.position, target.position, duration);
+      final relayDist = flagship.position.distanceTo(relay.position) +
+          relay.position.distanceTo(target.position);
+
+      if (relayDist < directDist) {
+        // Relay path is shorter — two-leg pulse
+        final leg1Dist = flagship.position.distanceTo(relay.position);
+        final leg2Dist = relay.position.distanceTo(target.position);
+        spawnTransitPulse(flagship.position, relay.position,
+            (leg1Dist / 20.0).clamp(0.5, 8.0));
+        spawnTransitPulse(relay.position, target.position,
+            (leg2Dist / 20.0).clamp(0.3, 6.0));
+        return;
+      }
     }
+
+    // Direct path (closer or no relay)
+    spawnTransitPulse(flagship.position, target.position,
+        (directDist / 20.0).clamp(0.5, 10.0));
   }
 
   void togglePause() {
