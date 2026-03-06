@@ -75,16 +75,30 @@ Ships are defined by physical properties first, tactical role second. The physic
 | Weapon range | Engagement distance. |
 | Weapon power | Damage output. |
 | Durability | How much damage the ship absorbs. |
-| Command capacity | How many units this ship can coordinate orders for (flagship / relay only). |
+| Role tags | Behavioral capabilities: directFire, missile, torpedo, pointDefense, intercept, flak, flanking, jamming, repair, heavyBroadside |
 
-### Ship Classes (MVP)
+### Ship Classes
 
-- **Flagship (Capital):** Highest command capacity, heaviest armor, slowest to maneuver. Loss = defeat.
-- **Command Relay:** Medium mass, extends command reach. Loss = subordinate ships go autonomous.
-- **Heavy Line:** High durability and firepower, slow. The hammer.
-- **Light Escort:** Medium speed, screening role. Protects capital ships.
-- **Strike Carrier:** Medium mass, long weapon range. Stand-off fire platform.
-- **Fast Raider:** Lowest mass, highest speed. Flanking and harassment. Fragile.
+See `docs/product/ship-roster.md` for the full roster, stats, and balance rationale.
+
+**Tier 0 — Command**
+- **Flagship:** Command anchor. Loss = defeat.
+
+**Tier 1 — Flak / Screen (cost 1–2)**
+- **Gunboat:** Cheap swarm. Flanking bonus. Fragile.
+- **Interceptor:** Anti-missile hunter. Pursues carrier groups.
+- **Flak Frigate:** Area burst weapon. Punishes clustered formations.
+
+**Tier 2 — Line / Middle (cost 3–4)**
+- **Destroyer:** Torpedo salvo. Ignores point defense. Predator of capitals.
+- **Heavy Cruiser:** Line anchor. Passive PD. Durable.
+- **EW Cruiser:** Jamming field. Cuts enemy weapon range 35%. No weapons.
+- **Strike Carrier:** Missile platform. Long range. Interceptable.
+- **Repair Tender:** Heals allies. No weapons. High-priority target.
+
+**Tier 3 — Capitals (cost 5–8)**
+- **Battlecruiser:** Mobile capital. Direct fire + missile. Fast for its class.
+- **Dreadnought:** Apex firepower. Extreme range. Countered by torpedoes and EW.
 
 ---
 
