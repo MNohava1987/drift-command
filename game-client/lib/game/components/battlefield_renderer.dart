@@ -32,8 +32,8 @@ class _Star {
 /// Owns the world→canvas transform, including zoom. All game logic uses world
 /// coordinates; this component converts them to screen pixels.
 class BattlefieldRenderer extends Component {
-  static const double kWorldWidth = 1000.0;
-  static const double kWorldHeight = 600.0;
+  static const double kWorldWidth = 2000.0;
+  static const double kWorldHeight = 1200.0;
 
   static const int _playerBase = 0xFF4A90D9;
   static const int _playerFlagship = 0xFF74B4FF;
@@ -81,8 +81,8 @@ class BattlefieldRenderer extends Component {
     final rng = math.Random(42);
     _stars = [];
 
-    // Layer 1: 80 dim white stars
-    for (var i = 0; i < 80; i++) {
+    // Layer 1: 160 dim white stars
+    for (var i = 0; i < 160; i++) {
       _stars.add(_Star(
         position: Vector2(rng.nextDouble() * kWorldWidth, rng.nextDouble() * kWorldHeight),
         radius: 0.5,
@@ -91,8 +91,8 @@ class BattlefieldRenderer extends Component {
       ));
     }
 
-    // Layer 2: 50 medium stars with slight blue/yellow tints
-    for (var i = 0; i < 50; i++) {
+    // Layer 2: 100 medium stars with slight blue/yellow tints
+    for (var i = 0; i < 100; i++) {
       final tint = i % 2 == 0 ? const Color(0xFFCCDDFF) : const Color(0xFFFFFACC);
       _stars.add(_Star(
         position: Vector2(rng.nextDouble() * kWorldWidth, rng.nextDouble() * kWorldHeight),
@@ -102,12 +102,12 @@ class BattlefieldRenderer extends Component {
       ));
     }
 
-    // Layer 3: 20 bright varied-color stars
+    // Layer 3: 40 bright varied-color stars
     const brightColors = [
       Color(0xFFFFFFFF), Color(0xFFAADDFF), Color(0xFFFFEEAA),
       Color(0xFFFFCCAA), Color(0xFFCCFFDD),
     ];
-    for (var i = 0; i < 20; i++) {
+    for (var i = 0; i < 40; i++) {
       _stars.add(_Star(
         position: Vector2(rng.nextDouble() * kWorldWidth, rng.nextDouble() * kWorldHeight),
         radius: 1.3,
@@ -138,6 +138,7 @@ class BattlefieldRenderer extends Component {
     _drawSensorGhosts(canvas, state);
     _drawOrderLines(canvas, state);
     _drawShips(canvas, state);
+    _drawProjectiles(canvas);
     _drawParticles(canvas);
     _drawTransitPulses(canvas);
   }
@@ -367,31 +368,60 @@ class BattlefieldRenderer extends Component {
     canvas.drawPath(shapePath, Paint()..color = color);
     canvas.restore();
 
-    // Engine trail when moving fast
-    if (ship.velocity.length > 8) {
-      final speed = ship.velocity.length;
-      final alpha = ((speed / 120.0).clamp(0.0, 1.0) * 180).toInt();
-      final rearAngle = ship.heading + math.pi;
-      final rearOffset = Offset(
-        co.dx + math.cos(rearAngle) * (radius + 3),
-        co.dy + math.sin(rearAngle) * (radius + 3),
+    // Directional engine burn using thrustVector
+    final thrustLen = ship.thrustVector.length;
+    if (thrustLen > 0.1) {
+      // Engine burn appears at the opposite end of the thrust direction (rear of ship)
+      final burnAngle = math.atan2(-ship.thrustVector.y, -ship.thrustVector.x);
+      final burnAlpha = (thrustLen.clamp(0.0, 1.0) * 200).toInt();
+      final burnOffset = Offset(
+        co.dx + math.cos(burnAngle) * (radius + 3),
+        co.dy + math.sin(burnAngle) * (radius + 3),
       );
-      final trailPath = Path()
-        ..moveTo(rearOffset.dx + math.cos(rearAngle) * 5, rearOffset.dy + math.sin(rearAngle) * 5)
+      // Main bright core
+      final burnPath = Path()
+        ..moveTo(burnOffset.dx + math.cos(burnAngle) * 7, burnOffset.dy + math.sin(burnAngle) * 7)
         ..lineTo(
-          rearOffset.dx + math.cos(rearAngle + math.pi / 2) * 3,
-          rearOffset.dy + math.sin(rearAngle + math.pi / 2) * 3,
+          burnOffset.dx + math.cos(burnAngle + math.pi / 2) * 3,
+          burnOffset.dy + math.sin(burnAngle + math.pi / 2) * 3,
         )
         ..lineTo(
-          rearOffset.dx + math.cos(rearAngle - math.pi / 2) * 3,
-          rearOffset.dy + math.sin(rearAngle - math.pi / 2) * 3,
+          burnOffset.dx + math.cos(burnAngle - math.pi / 2) * 3,
+          burnOffset.dy + math.sin(burnAngle - math.pi / 2) * 3,
         )
         ..close();
-      canvas.drawPath(trailPath, Paint()..color = const Color(0xFFFF8800).withAlpha(alpha));
+      canvas.drawPath(
+        burnPath,
+        Paint()..color = const Color(0xFFFF8800).withAlpha(burnAlpha),
+      );
+      // Outer glow halo
+      canvas.drawCircle(
+        Offset(
+          burnOffset.dx + math.cos(burnAngle) * 4,
+          burnOffset.dy + math.sin(burnAngle) * 4,
+        ),
+        4.0,
+        Paint()..color = const Color(0xFFFFCC44).withAlpha(burnAlpha ~/ 3),
+      );
+    }
+
+    // Shield flash — expanding ring when hit recently
+    final battleTime = game.battleStateOrNull?.battleTime ?? 0.0;
+    final hitAge = battleTime - ship.lastHitAt;
+    if (hitAge >= 0 && hitAge < 0.35) {
+      final hitFade = 1.0 - (hitAge / 0.35);
+      final expandR = radius + 8 + hitAge * 60;
+      canvas.drawCircle(
+        co,
+        expandR,
+        Paint()
+          ..color = const Color(0xFF88EEFF).withAlpha((hitFade * 160).toInt())
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.5,
+      );
     }
 
     // Order-arrived flash ring
-    final battleTime = game.battleStateOrNull?.battleTime ?? 0.0;
     if (battleTime < ship.orderFlashUntil) {
       final fade = ((ship.orderFlashUntil - battleTime) / 0.45).clamp(0.0, 1.0);
       canvas.drawCircle(
@@ -557,6 +587,33 @@ class BattlefieldRenderer extends Component {
           canvas.drawCircle(to, 5.0, dotPaint);
           chainFrom = to;
         }
+      }
+    }
+  }
+
+  // ── Projectiles ───────────────────────────────────────────────────────────
+
+  void _drawProjectiles(Canvas canvas) {
+    for (final p in game.projectiles) {
+      final c = worldToCanvas(p.position);
+      final alpha = (p.life.clamp(0.0, 1.0) * 255).clamp(0, 255).toInt();
+      final co = Offset(c.x, c.y);
+      canvas.drawCircle(
+        co,
+        p.isMissile ? 2.5 : 1.5,
+        Paint()..color = p.color.withAlpha(alpha),
+      );
+      // Missile: short smoke trail
+      if (p.isMissile && p.velocity.length > 1.0) {
+        final trailVec = -p.velocity.normalized() * 12.0;
+        final trailEnd = worldToCanvas(p.position + trailVec);
+        canvas.drawLine(
+          co,
+          Offset(trailEnd.x, trailEnd.y),
+          Paint()
+            ..color = const Color(0xFFFFCC44).withAlpha(alpha ~/ 3)
+            ..strokeWidth = 1.2,
+        );
       }
     }
   }

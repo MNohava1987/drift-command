@@ -79,6 +79,8 @@ class ShipState {
   double orderFlashUntil;          // battle time until which to draw "order arrived" ring
 
   ShipMode shipMode = ShipMode.defensive;
+  Vector2 thrustVector = Vector2.zero();
+  double lastHitAt = -1.0;
 
   ShipState({
     required this.instanceId,

@@ -1,3 +1,11 @@
+import 'ship_data.dart';
+
+/// Range within which a ship has direct comms with the flagship (no relay needed).
+const double kDirectCommsRange = 500.0;
+
+/// Range within which a relay ship can bridge comms to a combat ship.
+const double kRelayCommsRange = 800.0;
+
 /// A node in the command hierarchy.
 /// Flagship is the root; command relay ships are intermediate nodes;
 /// combat ships are leaves.
@@ -43,6 +51,36 @@ class CommandTopology {
 
   CommandNode get flagship => nodes[flagshipNodeId]!;
 
+  /// Returns the connectivity tier for a ship:
+  /// - 2 = direct comms (within kDirectCommsRange of flagship)
+  /// - 1 = relay comms (relay within kDirectCommsRange of flagship AND relay within kRelayCommsRange of ship)
+  /// - 0 = isolated (no path to flagship)
+  int connectivityTier(ShipState ship, Map<String, ShipState> ships) {
+    final flagshipShip = ships[flagship.shipInstanceId];
+    if (flagshipShip == null || !flagshipShip.isAlive) return 0;
+    // Flagship itself is always tier 2
+    if (ship.instanceId == flagshipShip.instanceId) return 2;
+    if (!ship.isAlive) return 0;
+
+    final directDist = flagshipShip.position.distanceTo(ship.position);
+    if (directDist <= kDirectCommsRange) return 2;
+
+    // Check relay paths
+    for (final node in nodes.values) {
+      if (node.isRoot) continue;
+      final relay = ships[node.shipInstanceId];
+      if (relay == null || !relay.isAlive) continue;
+      final flagToRelay = flagshipShip.position.distanceTo(relay.position);
+      final relayToShip = relay.position.distanceTo(ship.position);
+      if (flagToRelay <= kDirectCommsRange && relayToShip <= kRelayCommsRange) return 1;
+    }
+
+    return 0;
+  }
+
+  /// Legacy connectivity check — preserved for existing tests.
+  /// Walks the command topology tree to determine if a ship has an unbroken
+  /// path to the flagship.
   bool isConnected(
     String shipInstanceId,
     Map<String, bool> aliveShips, {

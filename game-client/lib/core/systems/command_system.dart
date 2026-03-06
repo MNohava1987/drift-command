@@ -3,16 +3,20 @@ import '../models/ship_data.dart';
 import '../models/command_node.dart';
 import '../models/battle_state.dart';
 
-/// Base propagation speed in units/second.
-/// An order covering 100 units of distance takes 5 seconds to arrive
-/// at base speed (100 / 20 = 5).
-const double kBasePropagationSpeed = 20.0;
+/// Comms delay when a ship has direct line-of-sight to flagship (tier 2).
+const double kDirectCommsDelay = 1.0;
+
+/// Comms delay when a relay ship is bridging the connection (tier 1).
+const double kRelayCommsDelay = 3.0;
+
+/// Comms delay when a ship is isolated — no usable path to flagship (tier 0).
+const double kIsolatedDelay = 10.0;
 
 /// Handles order issuance, propagation delay calculation,
 /// and command topology maintenance.
 class CommandSystem {
   /// Issue an order from the flagship toward [targetShipId].
-  /// Calculates propagation delay through the command chain and
+  /// Calculates propagation delay based on connectivity tier and
   /// creates time-delayed Order objects on the target ship.
   void issueOrder({
     required BattleState state,
@@ -33,7 +37,6 @@ class CommandSystem {
     if (flagship == null || !flagship.isAlive) return;
 
     final delay = _calculatePropagationDelay(
-      flagship: flagship,
       target: target,
       topology: topology,
       ships: state.ships,
@@ -49,77 +52,42 @@ class CommandSystem {
       targetSpeedFraction: targetSpeedFraction,
     );
 
-    // Cap the queue at 3 pending orders; drop the oldest to preserve the newest intent.
-    if (target.pendingOrders.length >= 3) {
+    // Cap the queue at 6 pending orders; drop the oldest to preserve the newest intent.
+    if (target.pendingOrders.length >= 6) {
       target.pendingOrders.removeAt(0);
     }
     target.pendingOrders.add(order);
   }
 
   double _calculatePropagationDelay({
-    required ShipState flagship,
     required ShipState target,
     required CommandTopology topology,
     required Map<String, ShipState> ships,
     required Map<String, ShipData> registry,
   }) {
-    final assignedNodeId = target.assignedCommandNodeId;
-
-    if (assignedNodeId == null) {
-      // Direct order from flagship — full distance
-      final dist = flagship.position.distanceTo(target.position);
-      final targetData = registry[target.dataId];
-      final latencyMod = targetData?.commandLatencyMod ?? 1.0;
-      return (dist / kBasePropagationSpeed) * latencyMod;
-    }
-
-    final relayNode = topology.nodes[assignedNodeId];
-    if (relayNode == null) {
-      final dist = flagship.position.distanceTo(target.position);
-      return dist / kBasePropagationSpeed;
-    }
-
+    final tier = topology.connectivityTier(target, ships);
     final targetData = registry[target.dataId];
     final latencyMod = targetData?.commandLatencyMod ?? 1.0;
-    final directDist = flagship.position.distanceTo(target.position);
-    final directDelay = (directDist / kBasePropagationSpeed) * latencyMod;
 
-    final relay = ships[relayNode.shipInstanceId];
-    if (relay == null || !relay.isAlive) {
-      // Relay dead — check connectivity, fall back to direct
-      final connected = topology.isConnected(
-        target.instanceId,
-        {for (final s in ships.values) s.instanceId: s.isAlive},
-        assignedCommandNodeId: target.assignedCommandNodeId,
-      );
-      if (!connected) return double.infinity;
-      return directDelay;
+    switch (tier) {
+      case 2:
+        return kDirectCommsDelay * latencyMod;
+      case 1:
+        return kRelayCommsDelay * latencyMod;
+      default:
+        return kIsolatedDelay; // isolated ships get no latency mod benefit
     }
-
-    // Compare direct vs relay path — use whichever is shorter.
-    // Ships close to the flagship skip the relay entirely.
-    final flagToRelay = flagship.position.distanceTo(relay.position);
-    final relayToTarget = relay.position.distanceTo(target.position);
-    final relayDelay = ((flagToRelay + relayToTarget) / kBasePropagationSpeed) * latencyMod;
-
-    return directDelay < relayDelay ? directDelay : relayDelay;
   }
 
   /// Remove pending orders from disconnected ships and apply their doctrine.
   void applyDisconnectedDoctrine(BattleState state) {
     for (final faction in state.topologies.values) {
-      final aliveMap = state.aliveMap;
-
       for (final ship in state.ships.values) {
         if (!ship.isAlive) continue;
         if (ship.factionId != faction.factionId) continue;
 
-        final connected = faction.isConnected(
-          ship.instanceId,
-          aliveMap,
-          assignedCommandNodeId: ship.assignedCommandNodeId,
-        );
-        if (!connected &&
+        final tier = faction.connectivityTier(ship, state.ships);
+        if (tier == 0 &&
             (ship.pendingOrders.isNotEmpty || ship.activeOrder != null)) {
           ship.pendingOrders.clear();
           ship.activeOrder = null;

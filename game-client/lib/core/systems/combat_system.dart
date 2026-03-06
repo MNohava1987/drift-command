@@ -1,3 +1,4 @@
+import 'package:flame/components.dart';
 import '../models/ship_data.dart';
 import '../models/battle_state.dart';
 
@@ -19,10 +20,26 @@ const double kPointDefenseInterceptRate = 0.4; // 40% missile reduction
 class CombatSystem {
   final Map<String, ShipData> shipDataRegistry;
 
+  /// Called when a ship fires — spawn visual projectile in BattleGame.
+  void Function(Vector2 from, Vector2 to, bool isMissile)? onFire;
+
+  /// Per-attacker cooldown so we don't spawn a projectile every tick.
+  final Map<String, double> _fireCooldowns = {};
+
   CombatSystem({required this.shipDataRegistry});
 
   void update(BattleState state, double dt) {
     final alive = state.ships.values.where((s) => s.isAlive).toList();
+
+    // Decrement per-attacker fire visual cooldowns
+    for (final key in _fireCooldowns.keys.toList()) {
+      final v = _fireCooldowns[key]! - dt;
+      if (v <= 0) {
+        _fireCooldowns.remove(key);
+      } else {
+        _fireCooldowns[key] = v;
+      }
+    }
 
     for (final attacker in alive) {
       final data = shipDataRegistry[attacker.dataId];
@@ -32,7 +49,14 @@ class CombatSystem {
       final target = _selectTarget(attacker, state, data);
       if (target == null) continue;
 
-      _applyDamage(attacker: attacker, target: target, targetData: shipDataRegistry[target.dataId], data: data, state: state, dt: dt);
+      _applyDamage(
+        attacker: attacker,
+        target: target,
+        targetData: shipDataRegistry[target.dataId],
+        data: data,
+        state: state,
+        dt: dt,
+      );
     }
 
     // Check for deaths
@@ -81,12 +105,14 @@ class CombatSystem {
     required double dt,
   }) {
     double damage = 0;
+    bool isMissile = false;
 
     if (data.roleTags.contains(RoleTag.directFire)) {
       damage += (kWeaponDps[RoleTag.directFire] ?? 0) * dt;
     }
 
     if (data.roleTags.contains(RoleTag.missile)) {
+      isMissile = true;
       double missileDmg = (kWeaponDps[RoleTag.missile] ?? 0) * dt;
 
       // Check if target has point defense coverage from allied escorts in defensive mode
@@ -108,12 +134,22 @@ class CombatSystem {
       damage *= 0.80;
     }
 
+    if (damage > 0) {
+      target.lastHitAt = state.battleTime;
+
+      // Spawn visual projectile (throttled per attacker)
+      if (onFire != null && !_fireCooldowns.containsKey(attacker.instanceId)) {
+        onFire!(attacker.position.clone(), target.position.clone(), isMissile);
+        _fireCooldowns[attacker.instanceId] = 0.4;
+      }
+    }
+
     target.durability -= damage;
     target.durability = target.durability.clamp(0, double.infinity);
   }
 
   bool _hasNearbyPointDefense(ShipState target, BattleState state) {
-    const double pdRange = 80.0;
+    const double pdRange = 160.0; // doubled for 2× world scale
     return state.ships.values.any((s) =>
         s.isAlive &&
         s.factionId == target.factionId &&

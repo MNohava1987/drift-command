@@ -185,6 +185,7 @@ class KinematicSystem {
     // Apply thrust in current heading direction
     final thrustDir = Vector2(math.cos(ship.heading), math.sin(ship.heading));
     ship.velocity += thrustDir * data.maxAcceleration * dt;
+    ship.thrustVector = thrustDir; // used by renderer for engine burns
 
     // Cap to maxSpeed
     if (ship.velocity.length > maxSpeed) {
@@ -202,6 +203,10 @@ class KinematicSystem {
       final delta = _normalizeAngle(retrograde - ship.heading);
       final maxTurn = data.turnRate * dt;
       ship.heading += delta.abs() > maxTurn ? maxTurn * delta.sign : delta;
+      // Thrust is in current heading direction (retrograde while turning)
+      ship.thrustVector = Vector2(math.cos(ship.heading), math.sin(ship.heading));
+    } else {
+      ship.thrustVector = Vector2.zero();
     }
 
     final brakeForce = data.maxAcceleration * dt;

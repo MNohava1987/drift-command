@@ -13,7 +13,7 @@
       "instanceId": "p_flagship",
       "dataId": "flagship",
       "factionId": 0,
-      "position": [150, 300],
+      "position": [300, 600],
       "heading": 0,
       "commandNodeId": "pf_node",
       "commandNodeType": "flagship"
@@ -22,7 +22,7 @@
       "instanceId": "p_heavy",
       "dataId": "heavy_line",
       "factionId": 0,
-      "position": [200, 280],
+      "position": [400, 560],
       "heading": 0,
       "assignedCommandNodeId": "pf_node"
     },
@@ -30,7 +30,7 @@
       "instanceId": "p_escort",
       "dataId": "light_escort",
       "factionId": 0,
-      "position": [175, 330],
+      "position": [350, 660],
       "heading": 0,
       "assignedCommandNodeId": "pf_node"
     },
@@ -38,7 +38,7 @@
       "instanceId": "e_flagship",
       "dataId": "flagship",
       "factionId": 1,
-      "position": [850, 300],
+      "position": [1700, 600],
       "heading": 3.14159,
       "commandNodeId": "ef_node",
       "commandNodeType": "flagship"
@@ -47,7 +47,7 @@
       "instanceId": "e_relay",
       "dataId": "command_relay",
       "factionId": 1,
-      "position": [780, 300],
+      "position": [1560, 600],
       "heading": 3.14159,
       "commandNodeId": "er_node",
       "commandNodeType": "relay",
@@ -57,7 +57,7 @@
       "instanceId": "e_heavy_1",
       "dataId": "heavy_line",
       "factionId": 1,
-      "position": [750, 80],
+      "position": [1500, 160],
       "heading": 3.14159,
       "assignedCommandNodeId": "er_node"
     },
@@ -65,7 +65,7 @@
       "instanceId": "e_heavy_2",
       "dataId": "heavy_line",
       "factionId": 1,
-      "position": [750, 130],
+      "position": [1500, 260],
       "heading": 3.14159,
       "assignedCommandNodeId": "er_node"
     },
@@ -73,7 +73,7 @@
       "instanceId": "e_escort_1",
       "dataId": "light_escort",
       "factionId": 1,
-      "position": [750, 160],
+      "position": [1500, 320],
       "heading": 3.14159,
       "assignedCommandNodeId": "er_node"
     },
@@ -81,7 +81,7 @@
       "instanceId": "e_raider_1",
       "dataId": "fast_raider",
       "factionId": 1,
-      "position": [750, 180],
+      "position": [1500, 360],
       "heading": 3.14159,
       "assignedCommandNodeId": "ef_node"
     },
@@ -89,7 +89,7 @@
       "instanceId": "e_heavy_3",
       "dataId": "heavy_line",
       "factionId": 1,
-      "position": [750, 420],
+      "position": [1500, 840],
       "heading": 3.14159,
       "assignedCommandNodeId": "er_node"
     },
@@ -97,7 +97,7 @@
       "instanceId": "e_heavy_4",
       "dataId": "heavy_line",
       "factionId": 1,
-      "position": [750, 470],
+      "position": [1500, 940],
       "heading": 3.14159,
       "assignedCommandNodeId": "er_node"
     },
@@ -105,7 +105,7 @@
       "instanceId": "e_escort_2",
       "dataId": "light_escort",
       "factionId": 1,
-      "position": [750, 490],
+      "position": [1500, 980],
       "heading": 3.14159,
       "assignedCommandNodeId": "er_node"
     },
@@ -113,7 +113,7 @@
       "instanceId": "e_raider_2",
       "dataId": "fast_raider",
       "factionId": 1,
-      "position": [750, 520],
+      "position": [1500, 1040],
       "heading": 3.14159,
       "assignedCommandNodeId": "ef_node"
     }

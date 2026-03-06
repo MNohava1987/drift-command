@@ -90,6 +90,36 @@ class _TopBar extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
+          // ENGAGE button — only visible when time is frozen at 0×
+          ValueListenableBuilder<double>(
+            valueListenable: game.timeScaleNotifier,
+            builder: (_, scale, _) {
+              if (scale != 0.0) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: GestureDetector(
+                  onTap: game.engageBattle,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.greenAccent),
+                      borderRadius: BorderRadius.circular(4),
+                      color: Colors.greenAccent.withAlpha(40),
+                    ),
+                    child: const Text(
+                      'ENGAGE',
+                      style: TextStyle(
+                        color: Colors.greenAccent,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
           _TimeScaleSelector(game: game),
           const SizedBox(width: 8),
           ValueListenableBuilder<bool>(
@@ -180,30 +210,99 @@ class _ActionBar extends StatelessWidget {
             return Container(
               color: Colors.black.withAlpha(140),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  _SpeedSelector(game: game),
-                  const SizedBox(width: 16),
-                  _CommandButton(
-                    label: 'HOLD',
-                    enabled: pulseReady,
-                    onPressed: game.issueHold,
+                  // Formation panel (only visible when fleet mode is on)
+                  ValueListenableBuilder<bool>(
+                    valueListenable: game.fleetModeNotifier,
+                    builder: (_, fleetOn, _) {
+                      if (!fleetOn) return const SizedBox.shrink();
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            const Text(
+                              'FORMATION:',
+                              style: TextStyle(
+                                color: Colors.white38,
+                                fontSize: 9,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            _FormationButton(label: 'WEDGE', game: game),
+                            const SizedBox(width: 4),
+                            _FormationButton(label: 'SCREEN', game: game),
+                            const SizedBox(width: 4),
+                            _FormationButton(label: 'DIAMOND', game: game),
+                          ],
+                        ),
+                      );
+                    },
                   ),
-                  const SizedBox(width: 8),
-                  _CommandButton(
-                    label: 'RETREAT',
-                    enabled: pulseReady,
-                    onPressed: game.issueRetreat,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      _SpeedSelector(game: game),
+                      const SizedBox(width: 12),
+                      // FLEET toggle
+                      ValueListenableBuilder<bool>(
+                        valueListenable: game.fleetModeNotifier,
+                        builder: (_, fleetOn, _) => GestureDetector(
+                          onTap: game.toggleFleetMode,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: fleetOn
+                                    ? Colors.greenAccent
+                                    : Colors.white24,
+                              ),
+                              borderRadius: BorderRadius.circular(4),
+                              color: fleetOn
+                                  ? Colors.greenAccent.withAlpha(40)
+                                  : Colors.transparent,
+                            ),
+                            child: Text(
+                              'FLEET',
+                              style: TextStyle(
+                                color: fleetOn
+                                    ? Colors.greenAccent
+                                    : Colors.white38,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.0,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      _CommandButton(
+                        label: 'HOLD',
+                        enabled: pulseReady,
+                        onPressed: game.issueHold,
+                      ),
+                      const SizedBox(width: 8),
+                      _CommandButton(
+                        label: 'RETREAT',
+                        enabled: pulseReady,
+                        onPressed: game.issueRetreat,
+                      ),
+                      const SizedBox(width: 8),
+                      _CommandButton(
+                        label: 'CANCEL',
+                        enabled: true,
+                        onPressed: game.cancelOrders,
+                      ),
+                      const SizedBox(width: 12),
+                      _PulseIndicator(ready: pulseReady),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  _CommandButton(
-                    label: 'CANCEL',
-                    enabled: true,
-                    onPressed: game.cancelOrders,
-                  ),
-                  const SizedBox(width: 12),
-                  _PulseIndicator(ready: pulseReady),
                 ],
               ),
             );
@@ -375,13 +474,9 @@ class _ShipPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final topology = state.topologies[ship.factionId];
-    final isConnected = topology != null
-        ? topology.isConnected(
-            ship.instanceId,
-            state.aliveMap,
-            assignedCommandNodeId: ship.assignedCommandNodeId,
-          )
-        : false;
+    final tier = topology != null
+        ? topology.connectivityTier(ship, state.ships)
+        : 0;
 
     return Container(
       color: Colors.black.withAlpha(170),
@@ -409,7 +504,7 @@ class _ShipPanel extends StatelessWidget {
           const SizedBox(width: 16),
           _DurabilityBar(ship: ship),
           const SizedBox(width: 16),
-          _RelayStatus(connected: isConnected),
+          _RelayStatus(tier: tier),
           const SizedBox(width: 16),
           _ModeToggle(ship: ship),
           const SizedBox(width: 16),
@@ -463,25 +558,27 @@ class _DurabilityBar extends StatelessWidget {
 }
 
 class _RelayStatus extends StatelessWidget {
-  final bool connected;
+  /// 2 = direct, 1 = relay, 0 = isolated
+  final int tier;
 
-  const _RelayStatus({required this.connected});
+  const _RelayStatus({required this.tier});
 
   @override
   Widget build(BuildContext context) {
+    final (label, color, icon) = switch (tier) {
+      2 => ('DIRECT', Colors.greenAccent, Icons.link),
+      1 => ('RELAY', Colors.amber, Icons.link),
+      _ => ('ISOLATED', Colors.redAccent, Icons.link_off),
+    };
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(
-          connected ? Icons.link : Icons.link_off,
-          color: connected ? Colors.greenAccent : Colors.redAccent,
-          size: 14,
-        ),
+        Icon(icon, color: color, size: 14),
         const SizedBox(width: 4),
         Text(
-          connected ? 'RELAY OK' : 'ISOLATED',
+          label,
           style: TextStyle(
-            color: connected ? Colors.greenAccent : Colors.redAccent,
+            color: color,
             fontSize: 10,
             fontWeight: FontWeight.bold,
           ),
@@ -531,6 +628,37 @@ class _ModeToggleState extends State<_ModeToggle> {
           style: TextStyle(
             color: selected ? color : Colors.white38,
             fontSize: 10,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.8,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FormationButton extends StatelessWidget {
+  final String label;
+  final BattleGame game;
+
+  const _FormationButton({required this.label, required this.game});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => game.applyFormation(label),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.greenAccent.withAlpha(120)),
+          borderRadius: BorderRadius.circular(4),
+          color: Colors.greenAccent.withAlpha(15),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            color: Colors.greenAccent,
+            fontSize: 9,
             fontWeight: FontWeight.bold,
             letterSpacing: 0.8,
           ),
