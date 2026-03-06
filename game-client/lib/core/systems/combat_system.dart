@@ -54,12 +54,16 @@ class CombatSystem {
         .where((s) => s.isAlive && s.factionId != attacker.factionId)
         .toList();
 
+    final effectiveRange = attacker.shipMode == ShipMode.attack
+        ? data.weaponRange * 1.15
+        : data.weaponRange;
+
     ShipState? closest;
     double minDist = double.infinity;
 
     for (final enemy in enemies) {
       final dist = attacker.position.distanceTo(enemy.position);
-      if (dist <= data.weaponRange && dist < minDist) {
+      if (dist <= effectiveRange && dist < minDist) {
         minDist = dist;
         closest = enemy;
       }
@@ -85,13 +89,23 @@ class CombatSystem {
     if (data.roleTags.contains(RoleTag.missile)) {
       double missileDmg = (kWeaponDps[RoleTag.missile] ?? 0) * dt;
 
-      // Check if target has point defense coverage from allied escorts
+      // Check if target has point defense coverage from allied escorts in defensive mode
       final hasPointDefense = _hasNearbyPointDefense(target, state);
       if (hasPointDefense) {
         missileDmg *= (1.0 - kPointDefenseInterceptRate);
       }
 
       damage += missileDmg;
+    }
+
+    // Attack mode attacker deals more damage
+    if (attacker.shipMode == ShipMode.attack) {
+      damage *= 1.25;
+    }
+
+    // Defensive mode target absorbs less damage
+    if (target.shipMode == ShipMode.defensive) {
+      damage *= 0.80;
     }
 
     target.durability -= damage;
@@ -104,6 +118,7 @@ class CombatSystem {
         s.isAlive &&
         s.factionId == target.factionId &&
         s.instanceId != target.instanceId &&
+        s.shipMode == ShipMode.defensive &&
         (shipDataRegistry[s.dataId]?.roleTags.contains(RoleTag.pointDefense) ?? false) &&
         s.position.distanceTo(target.position) <= pdRange);
   }

@@ -13,6 +13,20 @@ const double kTrajectorySeconds = 8.0;
 /// In-game "sensor speed" — units per second. Controls how stale enemy data looks.
 const double kSensorSpeed = 400.0;
 
+class _Star {
+  final Vector2 position;
+  final double radius;
+  final int alpha;
+  final Color color;
+
+  const _Star({
+    required this.position,
+    required this.radius,
+    required this.alpha,
+    required this.color,
+  });
+}
+
 /// Renders the game world onto the Flame canvas.
 ///
 /// Owns the world→canvas transform, including zoom. All game logic uses world
@@ -38,7 +52,7 @@ class BattlefieldRenderer extends Component {
   // Zoom (1.0 = default, centered on world center)
   double _zoom = 1.0;
 
-  late List<Vector2> _stars;
+  late List<_Star> _stars;
 
   BattlefieldRenderer(this.game);
 
@@ -65,13 +79,42 @@ class BattlefieldRenderer extends Component {
   @override
   Future<void> onLoad() async {
     final rng = math.Random(42);
-    _stars = List.generate(
-      150,
-      (_) => Vector2(
-        rng.nextDouble() * kWorldWidth,
-        rng.nextDouble() * kWorldHeight,
-      ),
-    );
+    _stars = [];
+
+    // Layer 1: 80 dim white stars
+    for (var i = 0; i < 80; i++) {
+      _stars.add(_Star(
+        position: Vector2(rng.nextDouble() * kWorldWidth, rng.nextDouble() * kWorldHeight),
+        radius: 0.5,
+        alpha: 80,
+        color: const Color(0xFFFFFFFF),
+      ));
+    }
+
+    // Layer 2: 50 medium stars with slight blue/yellow tints
+    for (var i = 0; i < 50; i++) {
+      final tint = i % 2 == 0 ? const Color(0xFFCCDDFF) : const Color(0xFFFFFACC);
+      _stars.add(_Star(
+        position: Vector2(rng.nextDouble() * kWorldWidth, rng.nextDouble() * kWorldHeight),
+        radius: 0.8,
+        alpha: 140,
+        color: tint,
+      ));
+    }
+
+    // Layer 3: 20 bright varied-color stars
+    const brightColors = [
+      Color(0xFFFFFFFF), Color(0xFFAADDFF), Color(0xFFFFEEAA),
+      Color(0xFFFFCCAA), Color(0xFFCCFFDD),
+    ];
+    for (var i = 0; i < 20; i++) {
+      _stars.add(_Star(
+        position: Vector2(rng.nextDouble() * kWorldWidth, rng.nextDouble() * kWorldHeight),
+        radius: 1.3,
+        alpha: 220,
+        color: brightColors[i % brightColors.length],
+      ));
+    }
   }
 
   @override
@@ -89,11 +132,13 @@ class BattlefieldRenderer extends Component {
     final state = game.battleStateOrNull;
     if (state == null) return;
     _drawBackground(canvas);
+    _drawTacticalGrid(canvas);
     _drawCommandChainLines(canvas, state);
     _drawTrajectories(canvas, state);
     _drawSensorGhosts(canvas, state);
     _drawOrderLines(canvas, state);
     _drawShips(canvas, state);
+    _drawParticles(canvas);
     _drawTransitPulses(canvas);
   }
 
@@ -104,10 +149,13 @@ class BattlefieldRenderer extends Component {
       Rect.fromLTWH(_offX, _offY, kWorldWidth * _scale, kWorldHeight * _scale),
       Paint()..color = const Color(0xFF0A0A18),
     );
-    final starPaint = Paint()..color = const Color(0xAAFFFFFF);
     for (final star in _stars) {
-      final c = worldToCanvas(star);
-      canvas.drawCircle(Offset(c.x, c.y), 0.8, starPaint);
+      final c = worldToCanvas(star.position);
+      canvas.drawCircle(
+        Offset(c.x, c.y),
+        star.radius,
+        Paint()..color = star.color.withAlpha(star.alpha),
+      );
     }
     canvas.drawRect(
       Rect.fromLTWH(_offX, _offY, kWorldWidth * _scale, kWorldHeight * _scale),
@@ -118,12 +166,40 @@ class BattlefieldRenderer extends Component {
     );
   }
 
+  // ── Tactical grid ─────────────────────────────────────────────────────────
+
+  void _drawTacticalGrid(Canvas canvas) {
+    final gridPaint = Paint()
+      ..color = const Color(0x0A4488FF)
+      ..strokeWidth = 0.5;
+
+    const gridStep = 100.0;
+
+    // Vertical lines
+    var wx = 0.0;
+    while (wx <= kWorldWidth) {
+      final top = worldToCanvas(Vector2(wx, 0));
+      final bot = worldToCanvas(Vector2(wx, kWorldHeight));
+      canvas.drawLine(Offset(top.x, top.y), Offset(bot.x, bot.y), gridPaint);
+      wx += gridStep;
+    }
+
+    // Horizontal lines
+    var wy = 0.0;
+    while (wy <= kWorldHeight) {
+      final left = worldToCanvas(Vector2(0, wy));
+      final right = worldToCanvas(Vector2(kWorldWidth, wy));
+      canvas.drawLine(Offset(left.x, left.y), Offset(right.x, right.y), gridPaint);
+      wy += gridStep;
+    }
+  }
+
   // ── Trajectory projection ─────────────────────────────────────────────────
 
   void _drawTrajectories(Canvas canvas, BattleState state) {
     for (final ship in state.ships.values) {
       if (!ship.isAlive) continue;
-      if (ship.velocity.length < 2.0) continue; // skip near-stationary
+      if (ship.velocity.length < 2.0) continue;
 
       final isPlayer = ship.factionId == state.playerFactionId;
       final from = worldToCanvas(ship.position);
@@ -146,7 +222,6 @@ class BattlefieldRenderer extends Component {
         gapLength: 5.0,
       );
 
-      // Arrowhead at tip
       _drawArrow(canvas, from, to, paint);
     }
   }
@@ -178,32 +253,28 @@ class BattlefieldRenderer extends Component {
     );
   }
 
-  // ── Sensor ghost (enemy position delay) ───────────────────────────────────
+  // ── Sensor ghost ─────────────────────────────────────────────────────────
 
   void _drawSensorGhosts(Canvas canvas, BattleState state) {
-    // Reference point for sensor delay: player flagship position
     final playerTopology = state.topologies[state.playerFactionId];
     final flagshipId = playerTopology?.flagship.shipInstanceId;
-    final playerFlagship =
-        flagshipId != null ? state.ships[flagshipId] : null;
+    final playerFlagship = flagshipId != null ? state.ships[flagshipId] : null;
     if (playerFlagship == null) return;
 
     for (final ship in state.ships.values) {
       if (!ship.isAlive) continue;
-      if (ship.factionId == state.playerFactionId) continue; // only enemies
+      if (ship.factionId == state.playerFactionId) continue;
 
       final dist = playerFlagship.position.distanceTo(ship.position);
       final delay = dist / kSensorSpeed;
-      if (delay < 0.5) continue; // too close to matter
+      if (delay < 0.5) continue;
 
-      // Ghost = where the enemy appeared to be [delay] seconds ago
       final ghostPos = ship.position - ship.velocity * delay;
       final ghostCanvas = worldToCanvas(ghostPos);
       final actualCanvas = worldToCanvas(ship.position);
       final role = _roleForShip(ship, state);
       final radius = _radiusForRole(role) * _es;
 
-      // Ghost circle (faint)
       canvas.drawCircle(
         Offset(ghostCanvas.x, ghostCanvas.y),
         radius,
@@ -213,7 +284,6 @@ class BattlefieldRenderer extends Component {
           ..strokeWidth = 1.0,
       );
 
-      // Dotted line from ghost to actual position (the "where it probably is now")
       _drawDashedLine(
         canvas,
         Offset(ghostCanvas.x, ghostCanvas.y),
@@ -248,17 +318,24 @@ class BattlefieldRenderer extends Component {
     final radius = _radiusForRole(role) * _es;
     final center = worldToCanvas(ship.position);
     final co = Offset(center.x, center.y);
+    final isPlayer = ship.factionId == state.playerFactionId;
 
+    // Selection ring
     if (selected) {
+      final ringColor = isPlayer
+          ? (ship.shipMode == ShipMode.attack
+              ? const Color(0xFFD94A3A)
+              : const Color(0xFF4A90D9))
+          : const Color(0xFFFFFFFF);
       canvas.drawCircle(
         co,
         radius + 5,
         Paint()
-          ..color = const Color(0xFFFFFFFF).withAlpha(200)
+          ..color = ringColor.withAlpha(200)
           ..style = PaintingStyle.stroke
           ..strokeWidth = 1.5,
       );
-      if (ship.factionId == state.playerFactionId) {
+      if (isPlayer) {
         final wr = _weaponRangeForRole(role);
         if (wr > 0) {
           canvas.drawCircle(
@@ -273,11 +350,50 @@ class BattlefieldRenderer extends Component {
       }
     }
 
-    canvas.drawCircle(co, radius, Paint()..color = color);
+    // Glow: two soft circles before the ship shape
+    final glowColor = isPlayer
+        ? (ship.shipMode == ShipMode.attack
+            ? const Color(0xFFD94A3A)
+            : const Color(0xFF4A90D9))
+        : color;
+    canvas.drawCircle(co, radius + 10, Paint()..color = glowColor.withAlpha(15));
+    canvas.drawCircle(co, radius + 5, Paint()..color = glowColor.withAlpha(30));
+
+    // Directional ship shape
+    canvas.save();
+    canvas.translate(co.dx, co.dy);
+    canvas.rotate(ship.heading);
+    final shapePath = _shipPathForRole(role, radius / _radiusForRole(role));
+    canvas.drawPath(shapePath, Paint()..color = color);
+    canvas.restore();
+
+    // Engine trail when moving fast
+    if (ship.velocity.length > 8) {
+      final speed = ship.velocity.length;
+      final alpha = ((speed / 120.0).clamp(0.0, 1.0) * 180).toInt();
+      final rearAngle = ship.heading + math.pi;
+      final rearOffset = Offset(
+        co.dx + math.cos(rearAngle) * (radius + 3),
+        co.dy + math.sin(rearAngle) * (radius + 3),
+      );
+      final trailPath = Path()
+        ..moveTo(rearOffset.dx + math.cos(rearAngle) * 5, rearOffset.dy + math.sin(rearAngle) * 5)
+        ..lineTo(
+          rearOffset.dx + math.cos(rearAngle + math.pi / 2) * 3,
+          rearOffset.dy + math.sin(rearAngle + math.pi / 2) * 3,
+        )
+        ..lineTo(
+          rearOffset.dx + math.cos(rearAngle - math.pi / 2) * 3,
+          rearOffset.dy + math.sin(rearAngle - math.pi / 2) * 3,
+        )
+        ..close();
+      canvas.drawPath(trailPath, Paint()..color = const Color(0xFFFF8800).withAlpha(alpha));
+    }
 
     // Order-arrived flash ring
-    if (state.battleTime < ship.orderFlashUntil) {
-      final fade = ((ship.orderFlashUntil - state.battleTime) / 0.45).clamp(0.0, 1.0);
+    final battleTime = game.battleStateOrNull?.battleTime ?? 0.0;
+    if (battleTime < ship.orderFlashUntil) {
+      final fade = ((ship.orderFlashUntil - battleTime) / 0.45).clamp(0.0, 1.0);
       canvas.drawCircle(
         co,
         radius + 8,
@@ -288,14 +404,12 @@ class BattlefieldRenderer extends Component {
       );
     }
 
-    // Ship type label
-    _drawShipLabel(canvas, _labelForRole(role), co, radius,
-        ship.factionId == state.playerFactionId);
+    // Ship label — floats above the shape
+    _drawShipLabel(canvas, _labelForRole(role), co, radius, isPlayer);
 
-    // Heading indicator: where the ship's nose points (thruster orientation)
+    // Heading indicator
     {
-      final headingDir =
-          Vector2(math.cos(ship.heading), math.sin(ship.heading));
+      final headingDir = Vector2(math.cos(ship.heading), math.sin(ship.heading));
       final headingEnd = worldToCanvas(
         ship.position + headingDir * (_radiusForRole(role) + 20),
       );
@@ -308,7 +422,7 @@ class BattlefieldRenderer extends Component {
       );
     }
 
-    // Velocity vector: direction momentum is carrying the ship
+    // Velocity vector
     if (ship.velocity.length > 1.0) {
       final velDir = ship.velocity.normalized();
       final lineEnd = worldToCanvas(
@@ -328,6 +442,51 @@ class BattlefieldRenderer extends Component {
     if (data != null && ship.durability < data.maxDurability) {
       _drawHpBar(canvas, ship, data, center, radius);
     }
+  }
+
+  /// Returns ship path in local coords scaled to canvas size. Nose at +X.
+  Path _shipPathForRole(ShipRole role, double scale) {
+    final p = Path();
+    switch (role) {
+      case ShipRole.flagship:
+        p.moveTo(14 * scale, 0);
+        p.lineTo(6 * scale, -7 * scale);
+        p.lineTo(-12 * scale, -5 * scale);
+        p.lineTo(-14 * scale, 0);
+        p.lineTo(-12 * scale, 5 * scale);
+        p.lineTo(6 * scale, 7 * scale);
+      case ShipRole.heavyLine:
+        p.moveTo(11 * scale, 0);
+        p.lineTo(4 * scale, -6 * scale);
+        p.lineTo(-10 * scale, -6 * scale);
+        p.lineTo(-11 * scale, 0);
+        p.lineTo(-10 * scale, 6 * scale);
+        p.lineTo(4 * scale, 6 * scale);
+      case ShipRole.lightEscort:
+        p.moveTo(7 * scale, 0);
+        p.lineTo(-5 * scale, -4 * scale);
+        p.lineTo(-6 * scale, 0);
+        p.lineTo(-5 * scale, 4 * scale);
+      case ShipRole.fastRaider:
+        p.moveTo(9 * scale, 0);
+        p.lineTo(-7 * scale, -2.5 * scale);
+        p.lineTo(-5 * scale, 0);
+        p.lineTo(-7 * scale, 2.5 * scale);
+      case ShipRole.strikeCarrier:
+        p.moveTo(10 * scale, 0);
+        p.lineTo(3 * scale, -7 * scale);
+        p.lineTo(-10 * scale, -7 * scale);
+        p.lineTo(-12 * scale, 0);
+        p.lineTo(-10 * scale, 7 * scale);
+        p.lineTo(3 * scale, 7 * scale);
+      case ShipRole.commandRelay:
+        p.moveTo(0, -6 * scale);
+        p.lineTo(5 * scale, 0);
+        p.lineTo(0, 6 * scale);
+        p.lineTo(-5 * scale, 0);
+    }
+    p.close();
+    return p;
   }
 
   void _drawHpBar(
@@ -359,7 +518,6 @@ class BattlefieldRenderer extends Component {
       final sc = worldToCanvas(ship.position);
       final so = Offset(sc.x, sc.y);
 
-      // Active order — cyan solid
       final active = ship.activeOrder;
       if (active?.targetPosition != null) {
         final tc = worldToCanvas(active!.targetPosition!);
@@ -372,7 +530,6 @@ class BattlefieldRenderer extends Component {
         );
       }
 
-      // Pending orders — yellow dashed
       final pendingPaint = Paint()
         ..color = const Color(0xFFFFDD44).withAlpha(160)
         ..strokeWidth = 1.0;
@@ -381,6 +538,19 @@ class BattlefieldRenderer extends Component {
         final tc = worldToCanvas(order.targetPosition!);
         _drawDashedLine(canvas, so, Offset(tc.x, tc.y), pendingPaint);
       }
+    }
+  }
+
+  // ── Particles ─────────────────────────────────────────────────────────────
+
+  void _drawParticles(Canvas canvas) {
+    for (final p in game.particles) {
+      final c = worldToCanvas(p.position);
+      canvas.drawCircle(
+        Offset(c.x, c.y),
+        p.radius,
+        Paint()..color = p.color.withAlpha((p.life * 200).toInt().clamp(0, 255)),
+      );
     }
   }
 
@@ -484,9 +654,10 @@ class BattlefieldRenderer extends Component {
       ..addText(label);
     final para = pb.build()
       ..layout(ParagraphConstraints(width: radius * 2));
+    // Float label above the ship shape
     canvas.drawParagraph(
       para,
-      Offset(center.dx - radius, center.dy - para.height / 2),
+      Offset(center.dx - radius, center.dy - radius - 6 - para.height),
     );
   }
 
@@ -502,10 +673,10 @@ class BattlefieldRenderer extends Component {
     final flagshipO = Offset(flagshipC.x, flagshipC.y);
 
     final flagshipToRelayPaint = Paint()
-      ..color = const Color(0x26FFFFFF) // 15% white
+      ..color = const Color(0x26FFFFFF)
       ..strokeWidth = 1.0;
     final relayToCombatPaint = Paint()
-      ..color = const Color(0x1AFFFFFF) // 10% white
+      ..color = const Color(0x1AFFFFFF)
       ..strokeWidth = 0.8;
 
     for (final node in topology.nodes.values) {

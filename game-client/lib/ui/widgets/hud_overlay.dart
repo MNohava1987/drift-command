@@ -411,6 +411,8 @@ class _ShipPanel extends StatelessWidget {
           const SizedBox(width: 16),
           _RelayStatus(connected: isConnected),
           const SizedBox(width: 16),
+          _ModeToggle(ship: ship),
+          const SizedBox(width: 16),
           _OrderQueue(ship: ship, game: game),
         ],
       ),
@@ -485,6 +487,55 @@ class _RelayStatus extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _ModeToggle extends StatefulWidget {
+  final ShipState ship;
+
+  const _ModeToggle({required this.ship});
+
+  @override
+  State<_ModeToggle> createState() => _ModeToggleState();
+}
+
+class _ModeToggleState extends State<_ModeToggle> {
+  @override
+  Widget build(BuildContext context) {
+    final mode = widget.ship.shipMode;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _modeBtn('DEF', ShipMode.defensive,
+            const Color(0xFF4A90D9), mode == ShipMode.defensive),
+        const SizedBox(width: 4),
+        _modeBtn('ATK', ShipMode.attack,
+            const Color(0xFFD94A3A), mode == ShipMode.attack),
+      ],
+    );
+  }
+
+  Widget _modeBtn(String label, ShipMode mode, Color color, bool selected) {
+    return GestureDetector(
+      onTap: () => setState(() => widget.ship.shipMode = mode),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          border: Border.all(color: selected ? color : Colors.white24),
+          borderRadius: BorderRadius.circular(4),
+          color: selected ? color.withAlpha(60) : Colors.transparent,
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? color : Colors.white38,
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.8,
+          ),
+        ),
+      ),
     );
   }
 }

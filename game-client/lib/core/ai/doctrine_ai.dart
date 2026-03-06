@@ -51,10 +51,16 @@ class DoctrineAI {
 
     final playerFlagship = _findFlagship(state, state.playerFactionId);
     final myFlagship = _findFlagship(state, factionId);
+    final posture = _postureFor(factionId, state);
 
     for (final ship in myShips) {
       final data = registry[ship.dataId];
       if (data == null) continue;
+
+      // Sync ship mode to posture
+      ship.shipMode = (posture == AiPosture.aggressive || posture == AiPosture.flanking)
+          ? ShipMode.attack
+          : ShipMode.defensive;
 
       _applyShipDoctrine(
         state: state,
@@ -64,8 +70,13 @@ class DoctrineAI {
         playerShips: playerShips,
         playerFlagship: playerFlagship,
         myFlagship: myFlagship,
+        posture: posture,
       );
     }
+  }
+
+  AiPosture _postureFor(int factionId, BattleState state) {
+    return state.factionPostures[factionId] ?? AiPosture.aggressive;
   }
 
   void _applyShipDoctrine({
@@ -76,7 +87,10 @@ class DoctrineAI {
     required List<ShipState> playerShips,
     required ShipState? playerFlagship,
     required ShipState? myFlagship,
+    required AiPosture posture,
   }) {
+    if (_applyPostureOverride(ship, data, posture, state, playerShips, playerFlagship)) return;
+
     switch (data.role) {
       case ShipRole.flagship:
         // Flagship stays back, protects itself
@@ -126,10 +140,61 @@ class DoctrineAI {
     }
   }
 
+  /// Returns true if posture override handled this ship (skip role dispatch).
+  bool _applyPostureOverride(
+    ShipState ship,
+    ShipData data,
+    AiPosture posture,
+    BattleState state,
+    List<ShipState> playerShips,
+    ShipState? playerFlagship,
+  ) {
+    switch (posture) {
+      case AiPosture.aggressive:
+        // Default role-based dispatch handles aggressive
+        return false;
+
+      case AiPosture.defensive:
+        // Flagship never retreats; all ships HOLD unless enemy in weapon range
+        final nearEnemy = playerShips.any(
+          (p) => p.position.distanceTo(ship.position) <= data.weaponRange,
+        );
+        if (!nearEnemy) {
+          _issueHold(state, ship, ship.factionId);
+        }
+        return true;
+
+      case AiPosture.flanking:
+        // Raiders and escorts target perpendicular to player flagship; heavies push straight
+        if (data.role == ShipRole.heavyLine || data.role == ShipRole.flagship) {
+          if (playerFlagship != null) {
+            _issueAttack(state, ship, ship.factionId, playerFlagship);
+          } else if (playerShips.isNotEmpty) {
+            _issueAttack(state, ship, ship.factionId, playerShips.first);
+          }
+        } else if (playerFlagship != null) {
+          // Perpendicular position relative to player flagship
+          final toFlagship = playerFlagship.position - ship.position;
+          final perp = Vector2(-toFlagship.y, toFlagship.x).normalized() *
+              (data.weaponRange * 0.8);
+          final flankPos = playerFlagship.position + perp;
+          _issueMove(state, ship, ship.factionId, flankPos);
+        } else if (playerShips.isNotEmpty) {
+          _issueAttack(state, ship, ship.factionId, playerShips.first);
+        }
+        return true;
+
+      case AiPosture.holdAndFire:
+        // All ships HOLD and let CombatSystem handle auto-fire
+        _issueHold(state, ship, ship.factionId);
+        return true;
+    }
+  }
+
   bool _isThreatened(ShipState ship, BattleState state) {
     // Check whether any player ship is within threat range of this (enemy) ship.
     return state.playerShips.any((p) =>
-        p.isAlive && p.position.distanceTo(ship.position) < 120);
+        p.isAlive && p.position.distanceTo(ship.position) < 80);
   }
 
   Vector2 _nearestPlayerPosition(ShipState from, List<ShipState> players) {
@@ -184,6 +249,15 @@ class DoctrineAI {
       state: state,
       targetShipId: ship.instanceId,
       orderType: OrderType.retreat,
+      registry: registry,
+    );
+  }
+
+  void _issueHold(BattleState state, ShipState ship, int factionId) {
+    commandSystem.issueOrder(
+      state: state,
+      targetShipId: ship.instanceId,
+      orderType: OrderType.hold,
       registry: registry,
     );
   }

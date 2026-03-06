@@ -1,9 +1,12 @@
 import 'dart:convert';
+import 'dart:math' as math;
+import 'dart:ui' show Color;
 
 import 'package:flame/events.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter/foundation.dart';
+import 'package:flame_audio/flame_audio.dart';
 
 import '../core/models/battle_state.dart';
 import '../core/models/ship_data.dart';
@@ -20,9 +23,13 @@ import 'components/battlefield_renderer.dart';
 /// for Flutter HUD widgets.
 class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
   final String scenarioAssetPath;
+  final bool carryDamage;
+  final Map<String, double>? startingDurabilityFractions;
 
   BattleGame({
     this.scenarioAssetPath = 'assets/scenarios/scenario_001.json',
+    this.carryDamage = false,
+    this.startingDurabilityFractions,
   });
 
   // ── Systems ──────────────────────────────────────────────────────────────
@@ -47,6 +54,13 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
   /// Visual-only transit pulses. Each entry is [fromPos, toPos, progress 0→1, speed].
   final List<TransitPulse> transitPulses = [];
 
+  /// Particle explosions (visual only).
+  final List<BattleParticle> particles = [];
+
+  final _rng = math.Random();
+  double _weaponSoundCooldown = 0.0;
+  bool _audioReady = false;
+
   // ── HUD notifiers (listened to by Flutter widgets) ───────────────────────
   final tempoBandNotifier = ValueNotifier<TempoBand>(TempoBand.distant);
   final selectedShipNotifier = ValueNotifier<ShipState?>(null);
@@ -69,7 +83,22 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
 
     final jsonStr = await rootBundle.loadString(scenarioAssetPath);
     final jsonMap = jsonDecode(jsonStr) as Map<String, dynamic>;
-    _state = ScenarioLoader.fromJson(jsonMap, kShipDefinitions);
+    _state = ScenarioLoader.fromJson(
+      jsonMap,
+      kShipDefinitions,
+      carryDamage: carryDamage,
+      startingDurabilityFractions: startingDurabilityFractions,
+    );
+
+    try {
+      await FlameAudio.audioCache.loadAll([
+        'order_click.ogg',
+        'weapon_fire.ogg',
+        'explosion.ogg',
+        'engine_hum.ogg',
+      ]);
+      _audioReady = true;
+    } catch (_) {}
 
     _renderer = BattlefieldRenderer(this);
     await add(_renderer);
@@ -105,10 +134,39 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
       allShips: _state.ships,
     );
 
-    _combat.update(_state, scaledDt);
-    _checkWinLoss();
+    // Snapshot alive status before combat resolves this tick
+    final wasAlive = {for (final e in _state.ships.entries) e.key: e.value.isAlive};
 
+    _combat.update(_state, scaledDt);
+
+    // Detect new deaths and spawn explosions; weapon fire sound (throttled)
+    bool combatHappened = false;
+    for (final ship in _state.ships.values) {
+      if (wasAlive[ship.instanceId] == true && !ship.isAlive) {
+        _spawnExplosion(ship);
+      }
+    }
+    // Throttled weapon fire sound: fire if any ship is in combat this tick
+    if (_weaponSoundCooldown <= 0) {
+      combatHappened = _state.ships.values.any((attacker) {
+        if (!attacker.isAlive) return false;
+        return _state.ships.values.any((target) =>
+            target.isAlive &&
+            target.factionId != attacker.factionId &&
+            attacker.position.distanceTo(target.position) <=
+                (kShipDefinitions[attacker.dataId]?.weaponRange ?? 0) * 1.2);
+      });
+      if (combatHappened) {
+        playSound('weapon_fire.ogg');
+        _weaponSoundCooldown = 1.0;
+      }
+    }
+
+    _checkWinLoss();
     _advanceTransitPulses(scaledDt);
+    _advanceParticles(scaledDt);
+
+    if (_weaponSoundCooldown > 0) _weaponSoundCooldown -= scaledDt;
 
     // Refresh HUD notifiers
     tempoBandNotifier.value = _state.tempoBand;
@@ -183,6 +241,7 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
     _tempoSystem.advanceCommandPulse(_state);
     commandPulseReadyNotifier.value = false;
     _spawnOrderPulse(_selectedShip!);
+    playSound('order_click.ogg');
   }
 
   /// Spawns a visual pulse along whichever path the order actually took
@@ -256,6 +315,7 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
     _tempoSystem.advanceCommandPulse(_state);
     commandPulseReadyNotifier.value = false;
     _spawnOrderPulse(_selectedShip!);
+    playSound('order_click.ogg');
   }
 
   /// Issue a RETREAT order (move to own flagship position) to the selected ship.
@@ -278,6 +338,7 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
     _tempoSystem.advanceCommandPulse(_state);
     commandPulseReadyNotifier.value = false;
     _spawnOrderPulse(_selectedShip!);
+    playSound('order_click.ogg');
   }
 
   void _checkWinLoss() {
@@ -338,6 +399,48 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
       return p.progress >= 1.0;
     });
   }
+
+  void _spawnExplosion(ShipState ship) {
+    const baseColor = Color(0xFFFF8800);
+    final factionColor = ship.factionId == _state.playerFactionId
+        ? const Color(0xFF4A90D9)
+        : const Color(0xFFD94A4A);
+    final blended = Color.fromARGB(
+      255,
+      ((baseColor.r + factionColor.r) * 127.5).round(),
+      ((baseColor.g + factionColor.g) * 127.5).round(),
+      ((baseColor.b + factionColor.b) * 127.5).round(),
+    );
+
+    for (var i = 0; i < 14; i++) {
+      final angle = _rng.nextDouble() * math.pi * 2;
+      final speed = 50.0 + _rng.nextDouble() * 70.0;
+      particles.add(BattleParticle(
+        position: ship.position.clone(),
+        velocity: Vector2(math.cos(angle) * speed, math.sin(angle) * speed),
+        life: 1.0,
+        color: blended,
+        radius: 2.5 + _rng.nextDouble() * 3.5,
+      ));
+    }
+    playSound('explosion.ogg');
+  }
+
+  void _advanceParticles(double dt) {
+    particles.removeWhere((p) {
+      p.life -= dt * 0.7;
+      p.position.add(p.velocity * dt);
+      p.radius *= 1.008;
+      return p.life <= 0;
+    });
+  }
+
+  void playSound(String name) {
+    if (!_audioReady) return;
+    try {
+      FlameAudio.play(name);
+    } catch (_) {}
+  }
 }
 
 /// A visual-only dot that travels along the command chain when an order is issued.
@@ -355,4 +458,21 @@ class TransitPulse {
   });
 
   Vector2 get currentPos => from + (to - from) * progress;
+}
+
+/// A single particle in an explosion effect.
+class BattleParticle {
+  Vector2 position;
+  Vector2 velocity;
+  double life; // 1.0 → 0.0, dies at 0
+  final Color color;
+  double radius;
+
+  BattleParticle({
+    required this.position,
+    required this.velocity,
+    required this.life,
+    required this.color,
+    required this.radius,
+  });
 }

@@ -33,6 +33,7 @@ dependencies:
 
   cupertino_icons: ^1.0.8
   flame: ^1.21.0
+  flame_audio: ^2.1.1
   shared_preferences: ^2.3.5
 
 dev_dependencies:
@@ -59,6 +60,7 @@ flutter:
 
   assets:
     - assets/scenarios/
+    - assets/audio/
 
   # To add additional assets to your application, add them to the assets section, like this:
   # assets:

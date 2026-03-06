@@ -3,6 +3,7 @@
   "name": "First Contact",
   "objective": "Destroy the enemy flagship",
   "playerFactionId": 0,
+  "factionPostures": {"1": "aggressive"},
   "winCondition": {
     "type": "destroyEnemyFlagship",
     "targetShipId": "e_flagship"

@@ -78,6 +78,8 @@ class ShipState {
   Doctrine activeDoctrine;
   double orderFlashUntil;          // battle time until which to draw "order arrived" ring
 
+  ShipMode shipMode = ShipMode.defensive;
+
   ShipState({
     required this.instanceId,
     required this.dataId,
@@ -124,6 +126,9 @@ enum OrderType {
   retreat,
   relay,
 }
+
+/// Persistent posture toggle set by the player per ship.
+enum ShipMode { defensive, attack }
 
 /// Fallback behavior when a ship is disconnected from its command chain.
 enum Doctrine {

@@ -3,6 +3,8 @@ import 'command_node.dart';
 
 enum TempoBand { distant, contact, engaged }
 
+enum AiPosture { aggressive, defensive, flanking, holdAndFire }
+
 enum BattlePhase { setup, active, won, lost }
 
 /// Complete snapshot of a battle at a given simulation time.
@@ -20,6 +22,7 @@ class BattleState {
   final int playerFactionId;
   final String objectiveDescription;
   WinCondition? winCondition;
+  final Map<int, AiPosture> factionPostures;
 
   BattleState({
     required this.playerFactionId,
@@ -31,6 +34,7 @@ class BattleState {
     this.tempoBand = TempoBand.distant,
     this.nextCommandPulse = 0.0,
     this.winCondition,
+    this.factionPostures = const {},
   });
 
   List<ShipState> get playerShips =>

@@ -12,10 +12,15 @@ class ScenarioLoader {
   /// Ships that have [commandNodeId]/[commandNodeType] fields become command
   /// nodes (flagship or relay). Ships with [assignedCommandNodeId] are
   /// combat/leaf ships that report through a relay.
+  ///
+  /// When [carryDamage] is true, [startingDurabilityFractions] (keyed by dataId)
+  /// are applied to player ships.
   static BattleState fromJson(
     Map<String, dynamic> json,
-    Map<String, ShipData> registry,
-  ) {
+    Map<String, ShipData> registry, {
+    bool carryDamage = false,
+    Map<String, double>? startingDurabilityFractions,
+  }) {
     final playerFactionId = json['playerFactionId'] as int;
     final objective = json['objective'] as String;
 
@@ -33,6 +38,15 @@ class ScenarioLoader {
       final heading = (s['heading'] as num).toDouble();
       final data = registry[dataId];
 
+        final maxDurability = data?.maxDurability ?? 100.0;
+      double startDurability = maxDurability;
+      if (carryDamage &&
+          factionId == playerFactionId &&
+          startingDurabilityFractions != null &&
+          startingDurabilityFractions.containsKey(dataId)) {
+        startDurability = maxDurability * startingDurabilityFractions[dataId]!.clamp(0.0, 1.0);
+      }
+
       final ship = ShipState(
         instanceId: instanceId,
         dataId: dataId,
@@ -42,7 +56,7 @@ class ScenarioLoader {
           (posRaw[1] as num).toDouble(),
         ),
         heading: heading,
-        durability: data?.maxDurability ?? 100.0,
+        durability: startDurability,
       );
 
       // Flagship / relay ships create a command node
@@ -131,12 +145,33 @@ class ScenarioLoader {
       );
     }
 
+    // ── Faction postures ─────────────────────────────────────────────────────
+    final factionPostures = <int, AiPosture>{};
+    if (json.containsKey('factionPostures')) {
+      final postureJson = json['factionPostures'] as Map<String, dynamic>;
+      for (final entry in postureJson.entries) {
+        final factionId = int.tryParse(entry.key);
+        if (factionId != null) {
+          factionPostures[factionId] = _parsePosture(entry.value as String);
+        }
+      }
+    }
+
     return BattleState(
       playerFactionId: playerFactionId,
       objectiveDescription: objective,
       ships: shipsMap,
       topologies: topologies,
       winCondition: winCondition,
+      factionPostures: factionPostures,
     );
   }
+
+  static AiPosture _parsePosture(String value) => switch (value) {
+        'aggressive' => AiPosture.aggressive,
+        'defensive' => AiPosture.defensive,
+        'flanking' => AiPosture.flanking,
+        'holdAndFire' => AiPosture.holdAndFire,
+        _ => AiPosture.aggressive,
+      };
 }
