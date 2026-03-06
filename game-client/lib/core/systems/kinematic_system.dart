@@ -66,6 +66,13 @@ class KinematicSystem {
         final enemy = order.targetShipId != null
             ? allShips[order.targetShipId]
             : null;
+
+        // Auto-clear when the target is destroyed — lets queued orders promote.
+        if (enemy != null && !enemy.isAlive) {
+          ship.activeOrder = null;
+          return;
+        }
+
         final enemyPos =
             (enemy != null && enemy.isAlive) ? enemy.position : order.targetPosition;
         if (enemyPos == null) return;

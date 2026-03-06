@@ -218,6 +218,10 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
       }
     }
 
+    // Player tap always interrupts the current active order — "tap here, go here"
+    // immediately. The pending queue (HOLD, RETREAT buttons) is unaffected.
+    _selectedShip!.activeOrder = null;
+
     if (tappedEnemy != null) {
       _commandSystem.issueOrder(
         state: _state,
