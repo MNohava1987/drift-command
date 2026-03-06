@@ -4,7 +4,7 @@
   "objective": "Destroy the enemy flagship",
   "playerFactionId": 0,
   "playerBudget": 8,
-  "availableSquadTypes": ["lineDivision", "raidPack", "escortScreen"],
+  "availableSquadTypes": ["lineDivision", "raidPack", "escortScreen", "gunboatPack", "interceptorScreen", "flakLine"],
   "winCondition": { "type": "destroyEnemyFlagship" },
   "factionPostures": { "1": "aggressive" },
   "playerSquads": [

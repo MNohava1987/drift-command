@@ -4,6 +4,7 @@ import '../models/battle_state.dart';
 import '../models/squad.dart';
 import '../systems/command_system.dart';
 import '../systems/engagement_system.dart';
+import '../../data/balance/ai_config.dart';
 
 /// Doctrine-driven AI for enemy factions.
 /// Operates at squad level. Re-evaluates on an interval scaled to tempo band.
@@ -14,12 +15,6 @@ class DoctrineAI {
 
   double _nextAIUpdate = 0;
 
-  static const Map<TempoBand, double> _aiInterval = {
-    TempoBand.distant: 15.0,
-    TempoBand.contact: 7.0,
-    TempoBand.engaged: 3.0,
-  };
-
   DoctrineAI({
     required this.commandSystem,
     required this.engagementSystem,
@@ -29,7 +24,7 @@ class DoctrineAI {
   void update(BattleState state, double dt) {
     if (state.battleTime < _nextAIUpdate) return;
     _nextAIUpdate =
-        state.battleTime + (_aiInterval[state.tempoBand] ?? 3.0);
+        state.battleTime + (kAiReplanInterval[state.tempoBand] ?? 3.0);
 
     // Set ShipMode on all ships based on faction posture
     for (final ship in state.ships.values) {
@@ -106,7 +101,7 @@ class DoctrineAI {
         final nearPlayer = state.playerSquads.any(
           (psq) =>
               state.squadIsAlive(psq) &&
-              psq.centroid.distanceTo(squad.centroid) <= 200,
+              psq.centroid.distanceTo(squad.centroid) <= kDefensiveHoldRange,
         );
         if (!nearPlayer) {
           commandSystem.issueSquadOrder(
@@ -117,11 +112,11 @@ class DoctrineAI {
         }
 
       case AiPosture.flanking:
-        // Move to 150 units lateral from player flagship centroid
+        // Move to kFlankingLateralOffset units lateral from player flagship centroid
         final toFlagship =
             playerFlagshipSquad.centroid - squad.centroid;
         if (toFlagship.length > 0.1) {
-          final perp = Vector2(-toFlagship.y, toFlagship.x).normalized() * 150;
+          final perp = Vector2(-toFlagship.y, toFlagship.x).normalized() * kFlankingLateralOffset;
           commandSystem.issueSquadOrder(
             state: state,
             squadId: squad.squadId,

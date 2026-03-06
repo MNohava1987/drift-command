@@ -20,6 +20,7 @@ import '../core/systems/engagement_system.dart';
 import '../core/ai/doctrine_ai.dart';
 import '../core/services/scenario_loader.dart';
 import '../data/ships/ship_definitions.dart';
+import '../data/game_config.dart';
 import 'components/battlefield_renderer.dart';
 
 /// Root Flame game. Owns the simulation loop and exposes ValueNotifiers
@@ -112,10 +113,10 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
 
     try {
       await FlameAudio.audioCache.loadAll([
-        'order_click.ogg',
-        'weapon_fire.ogg',
-        'explosion.ogg',
-        'engine_hum.ogg',
+        kSoundOrderClick,
+        kSoundWeaponFire,
+        kSoundExplosion,
+        kSoundEngineHum,
       ]);
       _audioReady = true;
     } catch (_) {}
@@ -179,7 +180,7 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
                   (kShipDefinitions[attacker.dataId]?.weaponRange ?? 0) * 1.2);
         });
         if (combatHappened) {
-          playSound('weapon_fire.ogg');
+          playSound(kSoundWeaponFire);
           _weaponSoundCooldown = 1.0;
         }
       }
@@ -203,7 +204,6 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
     if (_state.phase != BattlePhase.active) return;
 
     final worldPos = _renderer.canvasToWorld(event.localPosition);
-    const double selectionRadius = 40.0;
 
     // Tap a player ship → select its squad
     ShipState? tappedPlayer;
@@ -211,7 +211,7 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
     for (final ship in _state.ships.values) {
       if (!ship.isAlive || ship.factionId != _state.playerFactionId) continue;
       final d = worldPos.distanceTo(ship.position);
-      if (d < selectionRadius && d < nearestPlayer) {
+      if (d < kSelectionRadius && d < nearestPlayer) {
         nearestPlayer = d;
         tappedPlayer = ship;
       }
@@ -233,7 +233,7 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
     for (final ship in _state.ships.values) {
       if (!ship.isAlive || ship.factionId == _state.playerFactionId) continue;
       final d = worldPos.distanceTo(ship.position);
-      if (d < selectionRadius && d < nearestEnemy) {
+      if (d < kSelectionRadius && d < nearestEnemy) {
         nearestEnemy = d;
         tappedEnemy = ship;
       }
@@ -260,7 +260,7 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
     }
 
     _spawnOrderPulse(_selectedSquad!);
-    playSound('order_click.ogg');
+    playSound(kSoundOrderClick);
   }
 
   /// Issue a HOLD order to the selected squad.
@@ -273,7 +273,7 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
       orderType: OrderType.hold,
     );
     _spawnOrderPulse(_selectedSquad!);
-    playSound('order_click.ogg');
+    playSound(kSoundOrderClick);
   }
 
   /// Issue a RETREAT order to the selected squad — moves toward player flagship.
@@ -288,7 +288,7 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
       targetPosition: flagship?.position.clone(),
     );
     _spawnOrderPulse(_selectedSquad!);
-    playSound('order_click.ogg');
+    playSound(kSoundOrderClick);
   }
 
   /// Cancel the selected squad's active order and all member ship orders.
@@ -411,7 +411,7 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
         radius: 3.0 + _rng.nextDouble() * 4.0,
       ));
     }
-    playSound('explosion.ogg');
+    playSound(kSoundExplosion);
   }
 
   void _advanceParticles(double dt) {

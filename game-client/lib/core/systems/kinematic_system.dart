@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flame/components.dart';
 import '../models/ship_data.dart';
+import '../../data/game_config.dart';
 
 /// Handles all ship movement with true Newtonian momentum.
 ///
@@ -189,11 +190,6 @@ class KinematicSystem {
   }
 
   double _maxSpeedForClass(MassClass massClass) {
-    return switch (massClass) {
-      MassClass.light => 120.0,
-      MassClass.medium => 80.0,
-      MassClass.heavy => 50.0,
-      MassClass.capital => 30.0,
-    };
+    return kMaxSpeedByMass[massClass] ?? 80.0;
   }
 }

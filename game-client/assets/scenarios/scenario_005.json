@@ -4,7 +4,7 @@
   "objective": "Survive for 4 minutes",
   "playerFactionId": 0,
   "playerBudget": 12,
-  "availableSquadTypes": ["lineDivision", "raidPack", "escortScreen", "carrierStrike"],
+  "availableSquadTypes": ["lineDivision", "raidPack", "escortScreen", "carrierStrike", "gunboatPack", "interceptorScreen", "flakLine", "torpedoRun", "cruiserDivision", "ewFlight", "carrierGroup", "supportGroup", "battlecruiserGroup"],
   "winCondition": { "type": "surviveUntilTime", "timeLimit": 240 },
   "factionPostures": { "1": "aggressive" },
   "playerSquads": [
@@ -17,8 +17,10 @@
     { "squadId": "e_line_3", "type": "lineDivision", "factionId": 1, "position": [1650, 700], "heading": 3.14159, "engagementMode": "engage" },
     { "squadId": "e_line_4", "type": "lineDivision", "factionId": 1, "position": [1650, 1000], "heading": 3.14159, "engagementMode": "engage" },
     { "squadId": "e_escort_1", "type": "escortScreen", "factionId": 1, "position": [1550, 600], "heading": 3.14159, "engagementMode": "engage" },
-    { "squadId": "e_carrier_1", "type": "carrierStrike", "factionId": 1, "position": [1900, 600], "heading": 3.14159, "engagementMode": "engage" },
+    { "squadId": "e_carrier_1", "type": "carrierStrike", "factionId": 1, "position": [1900, 800], "heading": 3.14159, "engagementMode": "engage" },
     { "squadId": "e_raid_1", "type": "raidPack", "factionId": 1, "position": [1700, 350], "heading": 3.14159, "engagementMode": "engage" },
-    { "squadId": "e_raid_2", "type": "raidPack", "factionId": 1, "position": [1700, 850], "heading": 3.14159, "engagementMode": "engage" }
+    { "squadId": "e_raid_2", "type": "raidPack", "factionId": 1, "position": [1700, 850], "heading": 3.14159, "engagementMode": "engage" },
+    { "squadId": "e_dread_1", "type": "dreadnoughtGroup", "factionId": 1, "position": [1900, 400], "heading": 3.14159, "engagementMode": "engage" },
+    { "squadId": "e_btlcr_1", "type": "battlecruiserGroup", "factionId": 1, "position": [1750, 600], "heading": 3.14159, "engagementMode": "engage" }
   ]
 }

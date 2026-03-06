@@ -320,6 +320,16 @@ class _SquadPanel extends StatelessWidget {
         SquadType.raidPack => 'RAID PACK',
         SquadType.carrierStrike => 'CARRIER',
         SquadType.escortScreen => 'ESCORT',
+        SquadType.gunboatPack => 'GUNBOATS',
+        SquadType.interceptorScreen => 'INTERCEPT',
+        SquadType.flakLine => 'FLAK LINE',
+        SquadType.torpedoRun => 'TORPEDO',
+        SquadType.cruiserDivision => 'CRUISERS',
+        SquadType.ewFlight => 'EW FLIGHT',
+        SquadType.carrierGroup => 'CARRIERS',
+        SquadType.supportGroup => 'SUPPORT',
+        SquadType.battlecruiserGroup => 'BTLCRUISER',
+        SquadType.dreadnoughtGroup => 'DREADNOUGHT',
       };
 
   @override

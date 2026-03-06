@@ -3,9 +3,8 @@ import '../models/battle_state.dart';
 import '../models/ship_data.dart';
 import '../models/squad.dart';
 import 'command_system.dart';
-
-/// Range at which squads switch from their route to active engagement.
-const double kContactRange = 250.0;
+import '../../data/game_config.dart';
+import '../../data/balance/ai_config.dart';
 
 /// Applies engagement-mode behaviour for AI (non-player) squads.
 ///
@@ -58,7 +57,7 @@ class EngagementSystem {
         case EngagementMode.ghost:
           final toContact = nearest.centroid - squad.centroid;
           if (toContact.length > 0.1) {
-            final perp = Vector2(-toContact.y, toContact.x).normalized() * 180;
+            final perp = Vector2(-toContact.y, toContact.x).normalized() * kGhostEvadeDistance;
             commandSystem.issueSquadOrder(
               state: state,
               squadId: squad.squadId,

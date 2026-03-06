@@ -1,22 +1,16 @@
+import 'dart:math' as math;
 import 'package:flame/components.dart';
 import '../models/ship_data.dart';
 import '../models/battle_state.dart';
-
-/// Damage per second for each weapon category (MVP placeholder values).
-const Map<RoleTag, double> kWeaponDps = {
-  RoleTag.directFire: 8.0,
-  RoleTag.missile: 15.0,
-  RoleTag.pointDefense: 5.0,
-};
-
-const double kPointDefenseInterceptRate = 0.4; // 40% missile reduction
+import '../../data/balance/combat_balance.dart';
 
 /// Handles combat resolution: auto-fire, damage application, kill detection.
 ///
-/// MVP combat is intentionally simple:
-/// - Ships auto-fire when a valid target is in weapon range and facing arc
-/// - No player-driven targeting — doctrine and orders drive target selection
-/// - No subsystem damage
+/// Resolution order each tick:
+/// 1. Standard weapon fire (directFire, missile, torpedo)
+/// 2. Flak area burst (separate pass — affects friends + foes)
+/// 3. Repair aura (heal pass)
+/// 4. Death detection
 class CombatSystem {
   final Map<String, ShipData> shipDataRegistry;
 
@@ -41,6 +35,7 @@ class CombatSystem {
       }
     }
 
+    // ── Standard weapon fire ───────────────────────────────────────────────
     for (final attacker in alive) {
       final data = shipDataRegistry[attacker.dataId];
       if (data == null) continue;
@@ -59,7 +54,43 @@ class CombatSystem {
       );
     }
 
-    // Check for deaths
+    // ── Flak area burst (friend + foe within radius) ───────────────────────
+    for (final attacker in alive) {
+      final data = shipDataRegistry[attacker.dataId];
+      if (data == null) continue;
+      if (!data.roleTags.contains(RoleTag.flak)) continue;
+
+      final aliveFlagged = state.ships.values.where((s) => s.isAlive).toList();
+      for (final ship in aliveFlagged) {
+        if (ship.instanceId == attacker.instanceId) continue;
+        final dist = attacker.position.distanceTo(ship.position);
+        if (dist <= kFlakAreaRadius) {
+          final dmg = (kWeaponDps[RoleTag.directFire] ?? 8.0) * dt;
+          ship.durability -= dmg;
+          ship.durability = ship.durability.clamp(0, double.infinity);
+          ship.lastHitAt = state.battleTime;
+        }
+      }
+    }
+
+    // ── Repair aura ────────────────────────────────────────────────────────
+    for (final tender in alive) {
+      final data = shipDataRegistry[tender.dataId];
+      if (data == null) continue;
+      if (!data.roleTags.contains(RoleTag.repair)) continue;
+
+      for (final ally in state.ships.values) {
+        if (!ally.isAlive) continue;
+        if (ally.factionId != tender.factionId) continue;
+        final dist = tender.position.distanceTo(ally.position);
+        if (dist <= kRepairRange) {
+          final maxDur = shipDataRegistry[ally.dataId]?.maxDurability ?? ally.durability;
+          ally.durability = (ally.durability + kRepairHps * dt).clamp(0, maxDur);
+        }
+      }
+    }
+
+    // ── Death detection ────────────────────────────────────────────────────
     for (final ship in state.ships.values) {
       if (ship.durability <= 0 && ship.isAlive) {
         ship.isAlive = false;
@@ -68,7 +99,8 @@ class CombatSystem {
   }
 
   bool _hasOffensiveWeapons(ShipData data) {
-    return data.roleTags.any((t) => t == RoleTag.directFire || t == RoleTag.missile);
+    return data.roleTags.any((t) =>
+        t == RoleTag.directFire || t == RoleTag.missile || t == RoleTag.torpedo);
   }
 
   ShipState? _selectTarget(
@@ -77,13 +109,38 @@ class CombatSystem {
         .where((s) => s.isAlive && s.factionId != attacker.factionId)
         .toList();
 
-    final effectiveRange = attacker.shipMode == ShipMode.attack
-        ? data.weaponRange * 1.15
+    double effectiveRange = attacker.shipMode == ShipMode.attack
+        ? data.weaponRange * kAttackModeRangeBonus
         : data.weaponRange;
 
+    // Jamming: check if attacker is inside any enemy EW Cruiser field
+    final jammed = state.ships.values.any((s) =>
+        s.isAlive &&
+        s.factionId != attacker.factionId &&
+        (shipDataRegistry[s.dataId]?.roleTags.contains(RoleTag.jamming) ?? false) &&
+        s.position.distanceTo(attacker.position) <= kJammingRange);
+    if (jammed) effectiveRange *= (1.0 - kJammingRangePenalty);
+
+    // Intercept: prefer missile carriers (strike carriers)
+    if (data.roleTags.contains(RoleTag.intercept)) {
+      final missileCarrier = enemies.where((e) {
+        final dist = attacker.position.distanceTo(e.position);
+        final eDat = shipDataRegistry[e.dataId];
+        return dist <= effectiveRange &&
+            (eDat?.roleTags.contains(RoleTag.missile) ?? false);
+      }).fold<ShipState?>(null, (best, e) {
+        if (best == null) return e;
+        return attacker.position.distanceTo(e.position) <
+                attacker.position.distanceTo(best.position)
+            ? e
+            : best;
+      });
+      if (missileCarrier != null) return missileCarrier;
+    }
+
+    // Default: nearest enemy in range
     ShipState? closest;
     double minDist = double.infinity;
-
     for (final enemy in enemies) {
       final dist = attacker.position.distanceTo(enemy.position);
       if (dist <= effectiveRange && dist < minDist) {
@@ -91,7 +148,6 @@ class CombatSystem {
         closest = enemy;
       }
     }
-
     return closest;
   }
 
@@ -106,37 +162,66 @@ class CombatSystem {
     double damage = 0;
     bool isMissile = false;
 
+    // ── Direct fire ───────────────────────────────────────────────────────
     if (data.roleTags.contains(RoleTag.directFire)) {
       damage += (kWeaponDps[RoleTag.directFire] ?? 0) * dt;
     }
 
+    // ── Missile ───────────────────────────────────────────────────────────
     if (data.roleTags.contains(RoleTag.missile)) {
       isMissile = true;
       double missileDmg = (kWeaponDps[RoleTag.missile] ?? 0) * dt;
-
-      // Check if target has point defense coverage from allied escorts in defensive mode
-      final hasPointDefense = _hasNearbyPointDefense(target, state);
-      if (hasPointDefense) {
+      if (_hasNearbyPointDefense(target, state)) {
         missileDmg *= (1.0 - kPointDefenseInterceptRate);
       }
-
       damage += missileDmg;
     }
 
-    // Attack mode attacker deals more damage
-    if (attacker.shipMode == ShipMode.attack) {
-      damage *= 1.25;
+    // ── Torpedo salvo (ignores point defense) ─────────────────────────────
+    if (data.roleTags.contains(RoleTag.torpedo)) {
+      if (attacker.torpedoReloadUntil <= state.battleTime) {
+        // Burst: 3× concentrated damage (applied instantly this tick)
+        final burst = kTorpedoSalvoMultiplier *
+            (kWeaponDps[RoleTag.directFire] ?? 8.0) *
+            dt;
+        damage += burst;
+        attacker.torpedoReloadUntil = state.battleTime + kTorpedoReloadTime;
+      }
+      // During reload: no torpedo damage (skip)
     }
 
-    // Defensive mode target absorbs less damage
+    // ── Mode modifiers ────────────────────────────────────────────────────
+    if (attacker.shipMode == ShipMode.attack) {
+      damage *= kAttackModeDamageBonus;
+    }
     if (target.shipMode == ShipMode.defensive) {
-      damage *= 0.80;
+      damage *= kDefensiveModeReduction;
+    }
+
+    // ── Flanking bonus (rear arc) ─────────────────────────────────────────
+    if (data.roleTags.contains(RoleTag.flanking) && damage > 0) {
+      final toTarget = attacker.position - target.position;
+      final targetFwd =
+          Vector2(math.cos(target.heading), math.sin(target.heading));
+      final dot = toTarget.normalized().dot(targetFwd);
+      // dot < 0 means attacker is behind target (rear arc)
+      if (dot < 0) damage *= kFlankingDamageBonus;
+    }
+
+    // ── Heavy broadside bonus (perpendicular fire) ────────────────────────
+    if (data.roleTags.contains(RoleTag.heavyBroadside) && damage > 0) {
+      final toTargetDir = (target.position - attacker.position).normalized();
+      final attackerFwd =
+          Vector2(math.cos(attacker.heading), math.sin(attacker.heading));
+      // perp ≈ 0 when perpendicular (broadside), ≈ 1 when head-on
+      final perp = toTargetDir.dot(attackerFwd).abs();
+      final broadsideFactor = 1.0 + kHeavyBroadsideBonus * (1.0 - perp);
+      damage *= broadsideFactor;
     }
 
     if (damage > 0) {
       target.lastHitAt = state.battleTime;
 
-      // Spawn visual projectile (throttled per attacker)
       if (onFire != null && !_fireCooldowns.containsKey(attacker.instanceId)) {
         onFire!(attacker.position.clone(), target.position.clone(), isMissile);
         _fireCooldowns[attacker.instanceId] = 0.4;
@@ -148,13 +233,12 @@ class CombatSystem {
   }
 
   bool _hasNearbyPointDefense(ShipState target, BattleState state) {
-    const double pdRange = 160.0; // doubled for 2× world scale
     return state.ships.values.any((s) =>
         s.isAlive &&
         s.factionId == target.factionId &&
         s.instanceId != target.instanceId &&
         s.shipMode == ShipMode.defensive &&
         (shipDataRegistry[s.dataId]?.roleTags.contains(RoleTag.pointDefense) ?? false) &&
-        s.position.distanceTo(target.position) <= pdRange);
+        s.position.distanceTo(target.position) <= kPointDefenseRange);
   }
 }

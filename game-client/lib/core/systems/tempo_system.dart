@@ -1,4 +1,5 @@
 import '../models/battle_state.dart';
+import '../../data/game_config.dart';
 
 /// Evaluates the current tempo band based on proximity of opposing fleets.
 ///
@@ -27,9 +28,8 @@ class TempoSystem {
       }
     }
 
-    const double representativeWeaponRange = 150.0;
-    if (minDistance <= representativeWeaponRange) return TempoBand.engaged;
-    if (minDistance <= representativeWeaponRange * 2.0) return TempoBand.contact;
+    if (minDistance <= kRepresentativeWeaponRange) return TempoBand.engaged;
+    if (minDistance <= kRepresentativeWeaponRange * 2.0) return TempoBand.contact;
     return TempoBand.distant;
   }
 }

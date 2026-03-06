@@ -4,7 +4,7 @@
   "objective": "Destroy the enemy flagship",
   "playerFactionId": 0,
   "playerBudget": 10,
-  "availableSquadTypes": ["lineDivision", "raidPack", "escortScreen", "carrierStrike"],
+  "availableSquadTypes": ["lineDivision", "raidPack", "escortScreen", "carrierStrike", "gunboatPack", "interceptorScreen", "torpedoRun", "flakLine", "ewFlight"],
   "winCondition": { "type": "destroyEnemyFlagship" },
   "factionPostures": { "1": "flanking" },
   "playerSquads": [
@@ -15,6 +15,7 @@
     { "squadId": "e_line_1", "type": "lineDivision", "factionId": 1, "position": [1600, 250], "heading": 3.14159, "engagementMode": "engage" },
     { "squadId": "e_line_2", "type": "lineDivision", "factionId": 1, "position": [1600, 950], "heading": 3.14159, "engagementMode": "engage" },
     { "squadId": "e_raid_1", "type": "raidPack", "factionId": 1, "position": [1500, 400], "heading": 3.14159, "engagementMode": "engage" },
-    { "squadId": "e_raid_2", "type": "raidPack", "factionId": 1, "position": [1500, 800], "heading": 3.14159, "engagementMode": "engage" }
+    { "squadId": "e_raid_2", "type": "raidPack", "factionId": 1, "position": [1500, 800], "heading": 3.14159, "engagementMode": "engage" },
+    { "squadId": "e_torp_1", "type": "torpedoRun", "factionId": 1, "position": [1450, 600], "heading": 3.14159, "engagementMode": "engage" }
   ]
 }

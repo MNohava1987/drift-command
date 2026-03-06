@@ -11,6 +11,7 @@ import '../../core/models/ship_data.dart';
 import '../../core/models/squad.dart';
 import '../../core/services/scenario_loader.dart';
 import '../../data/ships/ship_definitions.dart';
+import '../../data/game_config.dart';
 import 'game_screen.dart';
 
 /// Pre-battle deployment screen.
@@ -33,9 +34,6 @@ class DeploymentScreen extends StatefulWidget {
 }
 
 class _DeploymentScreenState extends State<DeploymentScreen> {
-  static const double kWorldWidth = 2000.0;
-  static const double kWorldHeight = 1200.0;
-
   BattleState? _baseState; // loaded from JSON
   final List<_PlacedSquad> _placed = []; // player-placed squads (excluding flagship)
   String? _selectedPlacedId;
@@ -574,6 +572,16 @@ String _squadLabel(SquadType type) => switch (type) {
       SquadType.raidPack => 'Raid Pack',
       SquadType.carrierStrike => 'Carrier Strike',
       SquadType.escortScreen => 'Escort Screen',
+      SquadType.gunboatPack => 'Gunboat Pack',
+      SquadType.interceptorScreen => 'Interceptor Screen',
+      SquadType.flakLine => 'Flak Line',
+      SquadType.torpedoRun => 'Torpedo Run',
+      SquadType.cruiserDivision => 'Cruiser Division',
+      SquadType.ewFlight => 'EW Flight',
+      SquadType.carrierGroup => 'Carrier Group',
+      SquadType.supportGroup => 'Support Group',
+      SquadType.battlecruiserGroup => 'Battlecruiser',
+      SquadType.dreadnoughtGroup => 'Dreadnought',
     };
 
 String _squadTypeLabel(SquadType type) => switch (type) {
@@ -582,6 +590,16 @@ String _squadTypeLabel(SquadType type) => switch (type) {
       SquadType.raidPack => 'RAID',
       SquadType.carrierStrike => 'CSTR',
       SquadType.escortScreen => 'ESCR',
+      SquadType.gunboatPack => 'GBOA',
+      SquadType.interceptorScreen => 'INTC',
+      SquadType.flakLine => 'FLAK',
+      SquadType.torpedoRun => 'TORP',
+      SquadType.cruiserDivision => 'CRUS',
+      SquadType.ewFlight => 'EWFL',
+      SquadType.carrierGroup => 'CARR',
+      SquadType.supportGroup => 'SUPP',
+      SquadType.battlecruiserGroup => 'BCTL',
+      SquadType.dreadnoughtGroup => 'DRDN',
     };
 
 class _SidebarButton extends StatelessWidget {

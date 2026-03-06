@@ -6,13 +6,8 @@ import '../../core/models/ship_data.dart';
 import '../../core/models/battle_state.dart';
 import '../../core/models/squad.dart';
 import '../../data/ships/ship_definitions.dart';
+import '../../data/game_config.dart';
 import '../battle_game.dart';
-
-/// Seconds of velocity projection drawn ahead of each ship.
-const double kTrajectorySeconds = 8.0;
-
-/// In-game "sensor speed" — units per second. Controls how stale enemy data looks.
-const double kSensorSpeed = 400.0;
 
 class _Star {
   final Vector2 position;
@@ -33,9 +28,6 @@ class _Star {
 /// Owns the world→canvas transform, including zoom. All game logic uses world
 /// coordinates; this component converts them to screen pixels.
 class BattlefieldRenderer extends Component {
-  static const double kWorldWidth = 2000.0;
-  static const double kWorldHeight = 1200.0;
-
   static const int _playerBase = 0xFF4A90D9;
   static const int _playerFlagship = 0xFF74B4FF;
   static const int _enemyBase = 0xFFD94A4A;
@@ -479,36 +471,90 @@ class BattlefieldRenderer extends Component {
     final p = Path();
     switch (role) {
       case ShipRole.flagship:
+        // Wide hexagonal hull — command presence
         p.moveTo(14 * scale, 0);
         p.lineTo(6 * scale, -7 * scale);
         p.lineTo(-12 * scale, -5 * scale);
         p.lineTo(-14 * scale, 0);
         p.lineTo(-12 * scale, 5 * scale);
         p.lineTo(6 * scale, 7 * scale);
-      case ShipRole.heavyLine:
+      case ShipRole.heavyCruiser:
+        // Wide box — line anchor
         p.moveTo(11 * scale, 0);
         p.lineTo(4 * scale, -6 * scale);
         p.lineTo(-10 * scale, -6 * scale);
         p.lineTo(-11 * scale, 0);
         p.lineTo(-10 * scale, 6 * scale);
         p.lineTo(4 * scale, 6 * scale);
-      case ShipRole.lightEscort:
+      case ShipRole.interceptor:
+        // Sharp triangle — aggressive hunter
         p.moveTo(7 * scale, 0);
         p.lineTo(-5 * scale, -4 * scale);
         p.lineTo(-6 * scale, 0);
         p.lineTo(-5 * scale, 4 * scale);
-      case ShipRole.fastRaider:
+      case ShipRole.gunboat:
+        // Slim dart — fast swarm unit
         p.moveTo(9 * scale, 0);
         p.lineTo(-7 * scale, -2.5 * scale);
         p.lineTo(-5 * scale, 0);
         p.lineTo(-7 * scale, 2.5 * scale);
       case ShipRole.strikeCarrier:
+        // Wide flat hull — missile platform
         p.moveTo(10 * scale, 0);
         p.lineTo(3 * scale, -7 * scale);
         p.lineTo(-10 * scale, -7 * scale);
         p.lineTo(-12 * scale, 0);
         p.lineTo(-10 * scale, 7 * scale);
         p.lineTo(3 * scale, 7 * scale);
+      case ShipRole.flakFrigate:
+        // Short and wide — area burst platform
+        p.moveTo(6 * scale, 0);
+        p.lineTo(3 * scale, -6 * scale);
+        p.lineTo(-6 * scale, -6 * scale);
+        p.lineTo(-7 * scale, 0);
+        p.lineTo(-6 * scale, 6 * scale);
+        p.lineTo(3 * scale, 6 * scale);
+      case ShipRole.destroyer:
+        // Sleek needle — torpedo predator
+        p.moveTo(11 * scale, 0);
+        p.lineTo(2 * scale, -3 * scale);
+        p.lineTo(-9 * scale, -2 * scale);
+        p.lineTo(-10 * scale, 0);
+        p.lineTo(-9 * scale, 2 * scale);
+        p.lineTo(2 * scale, 3 * scale);
+      case ShipRole.ewCruiser:
+        // Medium body with antenna wings
+        p.moveTo(8 * scale, 0);
+        p.lineTo(2 * scale, -3 * scale);
+        p.lineTo(-2 * scale, -7 * scale); // upper antenna
+        p.lineTo(-4 * scale, -3 * scale);
+        p.lineTo(-8 * scale, 0);
+        p.lineTo(-4 * scale, 3 * scale);
+        p.lineTo(-2 * scale, 7 * scale); // lower antenna
+        p.lineTo(2 * scale, 3 * scale);
+      case ShipRole.repairTender:
+        // Boxy support ship
+        p.moveTo(7 * scale, -4 * scale);
+        p.lineTo(7 * scale, 4 * scale);
+        p.lineTo(-7 * scale, 5 * scale);
+        p.lineTo(-8 * scale, 0);
+        p.lineTo(-7 * scale, -5 * scale);
+      case ShipRole.battlecruiser:
+        // Elongated command hull — mobile capital
+        p.moveTo(13 * scale, 0);
+        p.lineTo(5 * scale, -8 * scale);
+        p.lineTo(-11 * scale, -6 * scale);
+        p.lineTo(-13 * scale, 0);
+        p.lineTo(-11 * scale, 6 * scale);
+        p.lineTo(5 * scale, 8 * scale);
+      case ShipRole.dreadnought:
+        // Massive wide silhouette — apex firepower
+        p.moveTo(14 * scale, 0);
+        p.lineTo(8 * scale, -10 * scale);
+        p.lineTo(-12 * scale, -10 * scale);
+        p.lineTo(-14 * scale, 0);
+        p.lineTo(-12 * scale, 10 * scale);
+        p.lineTo(8 * scale, 10 * scale);
     }
     p.close();
     return p;
@@ -634,7 +680,7 @@ class BattlefieldRenderer extends Component {
   }
 
   ShipRole _roleForShip(ShipState ship, BattleState state) {
-    return kShipDefinitions[ship.dataId]?.role ?? ShipRole.lightEscort;
+    return kShipDefinitions[ship.dataId]?.role ?? ShipRole.interceptor;
   }
 
   Color _colorForShip(ShipState ship, BattleState state, ShipRole role) {
@@ -646,26 +692,39 @@ class BattlefieldRenderer extends Component {
   }
 
   double _radiusForRole(ShipRole role) => switch (role) {
+        ShipRole.dreadnought => 14.0,
         ShipRole.flagship => 12.0,
-        ShipRole.heavyLine => 9.0,
-        ShipRole.strikeCarrier => 6.0,
-        ShipRole.lightEscort || ShipRole.fastRaider => 4.0,
+        ShipRole.battlecruiser => 11.0,
+        ShipRole.heavyCruiser => 9.0,
+        ShipRole.strikeCarrier || ShipRole.ewCruiser || ShipRole.repairTender => 6.0,
+        ShipRole.flakFrigate || ShipRole.destroyer => 5.0,
+        ShipRole.interceptor || ShipRole.gunboat => 4.0,
       };
 
   double _weaponRangeForRole(ShipRole role) => switch (role) {
-        ShipRole.flagship => 120.0,
-        ShipRole.heavyLine => 150.0,
+        ShipRole.dreadnought => 280.0,
         ShipRole.strikeCarrier => 200.0,
-        ShipRole.lightEscort => 100.0,
-        ShipRole.fastRaider => 90.0,
+        ShipRole.battlecruiser => 180.0,
+        ShipRole.heavyCruiser => 150.0,
+        ShipRole.flagship => 120.0,
+        ShipRole.interceptor => 110.0,
+        ShipRole.flakFrigate || ShipRole.destroyer => 80.0,
+        ShipRole.gunboat => 70.0,
+        ShipRole.ewCruiser || ShipRole.repairTender => 0.0,
       };
 
   String _labelForRole(ShipRole role) => switch (role) {
         ShipRole.flagship => 'F',
-        ShipRole.heavyLine => 'H',
-        ShipRole.lightEscort => 'E',
+        ShipRole.gunboat => 'G',
+        ShipRole.interceptor => 'I',
+        ShipRole.flakFrigate => 'K',
+        ShipRole.destroyer => 'D',
+        ShipRole.heavyCruiser => 'H',
+        ShipRole.ewCruiser => 'W',
         ShipRole.strikeCarrier => 'C',
-        ShipRole.fastRaider => 'X',
+        ShipRole.repairTender => 'R',
+        ShipRole.battlecruiser => 'B',
+        ShipRole.dreadnought => 'N',
       };
 
   void _drawShipLabel(

@@ -2,28 +2,46 @@ import 'package:flame/components.dart';
 
 /// The role that defines a ship's tactical identity and behavior profile.
 enum ShipRole {
+  // Tier 0 — Command
   flagship,
-  heavyLine,
-  lightEscort,
+  // Tier 1 — Flak / Screen
+  gunboat,
+  interceptor,
+  flakFrigate,
+  // Tier 2 — Line / Middle
+  destroyer,
+  heavyCruiser,
+  ewCruiser,
   strikeCarrier,
-  fastRaider,
+  repairTender,
+  // Tier 3 — Capitals
+  battlecruiser,
+  dreadnought,
 }
 
 /// Determines how quickly a ship responds to thrust and turn commands.
 enum MassClass {
-  light,   // fast raider, light escort
-  medium,  // command relay, strike carrier
-  heavy,   // heavy line ship
-  capital, // flagship
+  light,   // gunboat, interceptor, flak frigate, destroyer
+  medium,  // strike carrier, ew cruiser, repair tender
+  heavy,   // heavy cruiser, battlecruiser
+  capital, // flagship, dreadnought
 }
 
 /// Tactical tags used by the AI and combat resolution system.
 enum RoleTag {
+  // Existing
   directFire,
   missile,
   pointDefense,
-  screening,
+  screening, // legacy — no longer assigned to new hulls
   flanking,
+  // M7 additions
+  torpedo,
+  intercept,
+  flak,
+  jamming,
+  repair,
+  heavyBroadside,
 }
 
 /// Static ship configuration — design-time stats for a ship role.
@@ -74,6 +92,7 @@ class ShipState {
   ShipMode shipMode = ShipMode.defensive;
   Vector2 thrustVector = Vector2.zero();
   double lastHitAt = -1.0;
+  double torpedoReloadUntil = 0.0; // battle time when torpedo salvo is ready
 
   ShipState({
     required this.instanceId,

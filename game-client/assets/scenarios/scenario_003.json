@@ -4,7 +4,7 @@
   "objective": "Survive for 2 minutes",
   "playerFactionId": 0,
   "playerBudget": 8,
-  "availableSquadTypes": ["lineDivision", "escortScreen", "carrierStrike"],
+  "availableSquadTypes": ["lineDivision", "escortScreen", "carrierStrike", "cruiserDivision", "torpedoRun", "supportGroup", "flakLine"],
   "winCondition": { "type": "surviveUntilTime", "timeLimit": 120 },
   "factionPostures": { "1": "aggressive" },
   "playerSquads": [
@@ -15,6 +15,8 @@
     { "squadId": "e_line_1", "type": "lineDivision", "factionId": 1, "position": [1650, 300], "heading": 3.14159, "engagementMode": "engage" },
     { "squadId": "e_line_2", "type": "lineDivision", "factionId": 1, "position": [1650, 900], "heading": 3.14159, "engagementMode": "engage" },
     { "squadId": "e_escort_1", "type": "escortScreen", "factionId": 1, "position": [1550, 600], "heading": 3.14159, "engagementMode": "engage" },
-    { "squadId": "e_raid_1", "type": "raidPack", "factionId": 1, "position": [1700, 200], "heading": 3.14159, "engagementMode": "engage" }
+    { "squadId": "e_raid_1", "type": "raidPack", "factionId": 1, "position": [1700, 200], "heading": 3.14159, "engagementMode": "engage" },
+    { "squadId": "e_cruiser_1", "type": "cruiserDivision", "factionId": 1, "position": [1750, 450], "heading": 3.14159, "engagementMode": "engage" },
+    { "squadId": "e_support_1", "type": "supportGroup", "factionId": 1, "position": [1900, 600], "heading": 3.14159, "engagementMode": "direct" }
   ]
 }

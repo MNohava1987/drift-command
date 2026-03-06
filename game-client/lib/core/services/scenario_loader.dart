@@ -179,11 +179,23 @@ class ScenarioLoader {
   }
 
   static SquadType? _parseSquadType(String value) => switch (value) {
+        // M6 types
         'flagship' => SquadType.flagship,
         'lineDivision' => SquadType.lineDivision,
         'raidPack' => SquadType.raidPack,
         'carrierStrike' => SquadType.carrierStrike,
         'escortScreen' => SquadType.escortScreen,
+        // M7 types
+        'gunboatPack' => SquadType.gunboatPack,
+        'interceptorScreen' => SquadType.interceptorScreen,
+        'flakLine' => SquadType.flakLine,
+        'torpedoRun' => SquadType.torpedoRun,
+        'cruiserDivision' => SquadType.cruiserDivision,
+        'ewFlight' => SquadType.ewFlight,
+        'carrierGroup' => SquadType.carrierGroup,
+        'supportGroup' => SquadType.supportGroup,
+        'battlecruiserGroup' => SquadType.battlecruiserGroup,
+        'dreadnoughtGroup' => SquadType.dreadnoughtGroup,
         _ => null,
       };
 

@@ -4,7 +4,7 @@
   "objective": "Destroy all enemy forces",
   "playerFactionId": 0,
   "playerBudget": 8,
-  "availableSquadTypes": ["lineDivision", "raidPack", "escortScreen", "carrierStrike"],
+  "availableSquadTypes": ["lineDivision", "raidPack", "escortScreen", "carrierStrike", "gunboatPack", "interceptorScreen", "torpedoRun", "flakLine"],
   "winCondition": { "type": "destroyAllEnemies" },
   "factionPostures": { "1": "flanking" },
   "playerSquads": [

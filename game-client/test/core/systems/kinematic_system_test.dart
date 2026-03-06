@@ -8,28 +8,28 @@ void main() {
 
   setUp(() {
     registry = {
-      'heavy_line': const ShipData(
-        id: 'heavy_line',
-        displayName: 'Heavy Line Ship',
-        role: ShipRole.heavyLine,
+      'heavy_cruiser': const ShipData(
+        id: 'heavy_cruiser',
+        displayName: 'Heavy Cruiser',
+        role: ShipRole.heavyCruiser,
         massClass: MassClass.heavy,
         maxAcceleration: 8.0,
-        turnRate: 0.15,
+        turnRate: 0.2,
         sensorRange: 200.0,
         weaponRange: 150.0,
-        maxDurability: 100.0,
-        roleTags: [RoleTag.directFire],
+        maxDurability: 120.0,
+        roleTags: [RoleTag.directFire, RoleTag.pointDefense],
       ),
-      'fast_raider': const ShipData(
-        id: 'fast_raider',
-        displayName: 'Fast Raider',
-        role: ShipRole.fastRaider,
+      'gunboat': const ShipData(
+        id: 'gunboat',
+        displayName: 'Gunboat',
+        role: ShipRole.gunboat,
         massClass: MassClass.light,
-        maxAcceleration: 25.0,
-        turnRate: 1.2,
-        sensorRange: 250.0,
-        weaponRange: 100.0,
-        maxDurability: 40.0,
+        maxAcceleration: 38.0,
+        turnRate: 2.2,
+        sensorRange: 280.0,
+        weaponRange: 70.0,
+        maxDurability: 35.0,
         roleTags: [RoleTag.directFire, RoleTag.flanking],
       ),
     };
@@ -39,7 +39,7 @@ void main() {
     final system = KinematicSystem(shipDataRegistry: registry);
     final ship = ShipState(
       instanceId: 'ship1',
-      dataId: 'heavy_line',
+      dataId: 'heavy_cruiser',
       factionId: 0,
       position: Vector2(0, 0),
       heading: 0,
@@ -56,11 +56,11 @@ void main() {
     final system = KinematicSystem(shipDataRegistry: registry);
     final ship = ShipState(
       instanceId: 'ship1',
-      dataId: 'heavy_line',
+      dataId: 'heavy_cruiser',
       factionId: 0,
       position: Vector2(0, 0),
       heading: 0,
-      durability: 100,
+      durability: 120,
     )..velocity = Vector2(10, 0);
 
     // Ship moved in the braking direction (forward), but braking reduced speed
@@ -74,20 +74,20 @@ void main() {
 
     final heavy = ShipState(
       instanceId: 'heavy',
-      dataId: 'heavy_line',
+      dataId: 'heavy_cruiser',
       factionId: 0,
       position: Vector2(0, 0),
       heading: 0,
-      durability: 100,
+      durability: 120,
     );
 
     final light = ShipState(
       instanceId: 'light',
-      dataId: 'fast_raider',
+      dataId: 'gunboat',
       factionId: 0,
       position: Vector2(0, 0),
       heading: 0,
-      durability: 40,
+      durability: 35,
     );
 
     final target = Vector2(10000, 0);

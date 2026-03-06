@@ -90,6 +90,6 @@ void main() {
     expect(flagship.durability, kShipDefinitions['flagship']!.maxDurability);
 
     final raider = state.ships['e_raid_1_ship_0']!;
-    expect(raider.durability, kShipDefinitions['fast_raider']!.maxDurability);
+    expect(raider.durability, kShipDefinitions['gunboat']!.maxDurability);
   });
 }
