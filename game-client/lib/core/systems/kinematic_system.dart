@@ -176,15 +176,21 @@ class KinematicSystem {
 
   void _applyBraking(ShipState ship, ShipData data, double dt) {
     final speed = ship.velocity.length;
+
+    // Rotate heading toward retrograde (opposite of velocity) before slowing.
+    // Ships must turn their nose around to brake — heavy ships take longer.
+    if (speed > 2.0) {
+      final retrograde = math.atan2(-ship.velocity.y, -ship.velocity.x);
+      final delta = _normalizeAngle(retrograde - ship.heading);
+      final maxTurn = data.turnRate * dt;
+      ship.heading += delta.abs() > maxTurn ? maxTurn * delta.sign : delta;
+    }
+
     final brakeForce = data.maxAcceleration * dt;
     if (speed <= brakeForce) {
       ship.velocity = Vector2.zero();
     } else {
       ship.velocity -= ship.velocity.normalized() * brakeForce;
-    }
-    // Face braking direction
-    if (ship.velocity.length > 0.5) {
-      ship.heading = math.atan2(ship.velocity.y, ship.velocity.x);
     }
   }
 

@@ -292,7 +292,23 @@ class BattlefieldRenderer extends Component {
     _drawShipLabel(canvas, _labelForRole(role), co, radius,
         ship.factionId == state.playerFactionId);
 
-    // Velocity heading line (direction of travel)
+    // Heading indicator: where the ship's nose points (thruster orientation)
+    {
+      final headingDir =
+          Vector2(math.cos(ship.heading), math.sin(ship.heading));
+      final headingEnd = worldToCanvas(
+        ship.position + headingDir * (_radiusForRole(role) + 20),
+      );
+      canvas.drawLine(
+        co,
+        Offset(headingEnd.x, headingEnd.y),
+        Paint()
+          ..color = const Color(0xFFB0D8FF).withAlpha(200)
+          ..strokeWidth = 1.5,
+      );
+    }
+
+    // Velocity vector: direction momentum is carrying the ship
     if (ship.velocity.length > 1.0) {
       final velDir = ship.velocity.normalized();
       final lineEnd = worldToCanvas(

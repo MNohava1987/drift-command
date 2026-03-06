@@ -90,6 +90,8 @@ class _TopBar extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
+          _TimeScaleSelector(game: game),
+          const SizedBox(width: 8),
           ValueListenableBuilder<bool>(
             valueListenable: game.isPausedNotifier,
             builder: (_, paused, _) => GestureDetector(
@@ -357,7 +359,7 @@ class _ShipInfoBar extends StatelessWidget {
         if (ship.factionId != state.playerFactionId) {
           return const SizedBox.shrink();
         }
-        return _ShipPanel(ship: ship, state: state);
+        return _ShipPanel(ship: ship, state: state, game: game);
       },
     );
   }
@@ -366,8 +368,9 @@ class _ShipInfoBar extends StatelessWidget {
 class _ShipPanel extends StatelessWidget {
   final ShipState ship;
   final BattleState state;
+  final BattleGame game;
 
-  const _ShipPanel({required this.ship, required this.state});
+  const _ShipPanel({required this.ship, required this.state, required this.game});
 
   @override
   Widget build(BuildContext context) {
@@ -407,6 +410,8 @@ class _ShipPanel extends StatelessWidget {
           _DurabilityBar(ship: ship),
           const SizedBox(width: 16),
           _RelayStatus(connected: isConnected),
+          const SizedBox(width: 16),
+          _OrderQueue(ship: ship, game: game),
         ],
       ),
     );
@@ -482,6 +487,184 @@ class _RelayStatus extends StatelessWidget {
       ],
     );
   }
+}
+
+// ── Time scale selector ────────────────────────────────────────────────────────
+
+class _TimeScaleSelector extends StatelessWidget {
+  final BattleGame game;
+
+  const _TimeScaleSelector({required this.game});
+
+  static const _scales = [
+    (label: '0.5×', value: 0.5),
+    (label: '1×', value: 1.0),
+    (label: '2×', value: 2.0),
+    (label: '4×', value: 4.0),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<bool>(
+      valueListenable: game.isPausedNotifier,
+      builder: (_, paused, _) {
+        return ValueListenableBuilder<double>(
+          valueListenable: game.timeScaleNotifier,
+          builder: (_, scale, _) {
+            return Row(
+              mainAxisSize: MainAxisSize.min,
+              children: _scales.map((s) {
+                final isSelected = scale == s.value;
+                return GestureDetector(
+                  onTap: paused ? null : () => game.setTimeScale(s.value),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    margin: const EdgeInsets.only(right: 3),
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: paused
+                            ? Colors.white12
+                            : isSelected
+                                ? Colors.amber
+                                : Colors.white24,
+                      ),
+                      borderRadius: BorderRadius.circular(4),
+                      color: paused
+                          ? Colors.transparent
+                          : isSelected
+                              ? Colors.amber.withAlpha(40)
+                              : Colors.transparent,
+                    ),
+                    child: Text(
+                      s.label,
+                      style: TextStyle(
+                        color: paused
+                            ? Colors.white12
+                            : isSelected
+                                ? Colors.amber
+                                : Colors.white38,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+// ── Order queue ────────────────────────────────────────────────────────────────
+
+class _OrderQueue extends StatelessWidget {
+  final ShipState ship;
+  final BattleGame game;
+
+  const _OrderQueue({required this.ship, required this.game});
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<String>(
+      valueListenable: game.battleTimeTextNotifier,
+      builder: (_, _, _) {
+        final battleTime = game.battleStateOrNull?.battleTime ?? 0.0;
+        final active = ship.activeOrder;
+        final pending = ship.pendingOrders;
+
+        if (active == null && pending.isEmpty) {
+          return const Text(
+            'COASTING',
+            style: TextStyle(color: Colors.white24, fontSize: 10),
+          );
+        }
+
+        final lines = <Widget>[];
+        if (active != null) {
+          lines.add(_orderLine(active, battleTime, isActive: true));
+        }
+        for (final order in pending.take(2)) {
+          lines.add(_orderLine(order, battleTime, isActive: false));
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: lines,
+        );
+      },
+    );
+  }
+
+  Widget _orderLine(Order order, double battleTime, {required bool isActive}) {
+    final label = _labelForOrderType(order.type);
+    if (isActive) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+            color: const Color(0xFF00FFFF).withAlpha(30),
+            child: const Text(
+              'ACT',
+              style: TextStyle(
+                color: Color(0xFF00FFFF),
+                fontSize: 9,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(color: Colors.white70, fontSize: 10),
+          ),
+        ],
+      );
+    } else {
+      final wait = (order.arrivesAt - battleTime).clamp(0.0, double.infinity);
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+            color: Colors.white.withAlpha(10),
+            child: const Text(
+              'QUE',
+              style: TextStyle(
+                color: Colors.white38,
+                fontSize: 9,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            '${wait.toStringAsFixed(1)}s',
+            style: const TextStyle(color: Colors.amber, fontSize: 9),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: const TextStyle(color: Colors.white54, fontSize: 10),
+          ),
+        ],
+      );
+    }
+  }
+
+  String _labelForOrderType(OrderType type) => switch (type) {
+        OrderType.moveTo => 'MOVE',
+        OrderType.attackTarget => 'ATTACK',
+        OrderType.hold => 'HOLD',
+        OrderType.retreat => 'RETREAT',
+        OrderType.screen => 'SCREEN',
+        OrderType.relay => 'RELAY',
+      };
 }
 
 // ── Pause menu ────────────────────────────────────────────────────────────────

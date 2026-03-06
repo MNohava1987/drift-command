@@ -41,6 +41,9 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
   /// Approach speed for the next issued order: 0.25 / 0.5 / 1.0
   double selectedSpeed = 0.5;
 
+  /// Simulation time multiplier. 1.0 = real time.
+  double _timeScale = 1.0;
+
   /// Visual-only transit pulses. Each entry is [fromPos, toPos, progress 0→1, speed].
   final List<TransitPulse> transitPulses = [];
 
@@ -51,6 +54,7 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
   final battleTimeTextNotifier = ValueNotifier<String>('0:00');
   final commandPulseReadyNotifier = ValueNotifier<bool>(false);
   final isPausedNotifier = ValueNotifier<bool>(false);
+  final timeScaleNotifier = ValueNotifier<double>(1.0);
 
   // ── Public accessors ─────────────────────────────────────────────────────
   BattleState get battleState => _state;
@@ -76,6 +80,12 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
     overlays.add('hud');
   }
 
+  /// Set simulation time multiplier. 0.5 = half speed, 4.0 = 4× speed.
+  void setTimeScale(double scale) {
+    _timeScale = scale;
+    timeScaleNotifier.value = scale;
+  }
+
   @override
   void update(double dt) {
     super.update(dt);
@@ -83,21 +93,22 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
     if (_state.phase != BattlePhase.active) return;
 
     if (isPausedNotifier.value) return;
-    _tempoSystem.update(_state, dt);
-    _ai.update(_state, dt);
+    final scaledDt = dt * _timeScale;
+    _tempoSystem.update(_state, scaledDt);
+    _ai.update(_state, scaledDt);
 
     final aliveShips = _state.ships.values.where((s) => s.isAlive).toList();
     _kinematics.update(
       aliveShips,
-      dt,
+      scaledDt,
       battleTime: _state.battleTime,
       allShips: _state.ships,
     );
 
-    _combat.update(_state, dt);
+    _combat.update(_state, scaledDt);
     _checkWinLoss();
 
-    _advanceTransitPulses(dt);
+    _advanceTransitPulses(scaledDt);
 
     // Refresh HUD notifiers
     tempoBandNotifier.value = _state.tempoBand;
