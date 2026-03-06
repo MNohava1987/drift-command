@@ -15,7 +15,6 @@ void main() {
         massClass: MassClass.heavy,
         maxAcceleration: 8.0,
         turnRate: 0.15,
-        commandLatencyMod: 1.5,
         sensorRange: 200.0,
         weaponRange: 150.0,
         maxDurability: 100.0,
@@ -28,7 +27,6 @@ void main() {
         massClass: MassClass.light,
         maxAcceleration: 25.0,
         turnRate: 1.2,
-        commandLatencyMod: 0.8,
         sensorRange: 250.0,
         weaponRange: 100.0,
         maxDurability: 40.0,
@@ -54,7 +52,7 @@ void main() {
     expect(ship.velocity, Vector2.zero());
   });
 
-  test('ship with no pending orders brakes to a stop (auto-hold)', () {
+  test('ship with no active order brakes to a stop (auto-hold)', () {
     final system = KinematicSystem(shipDataRegistry: registry);
     final ship = ShipState(
       instanceId: 'ship1',
@@ -92,21 +90,9 @@ void main() {
       durability: 40,
     );
 
-    // Run for 10 seconds with no orders (coasting at zero velocity both start at)
-    // Add a move order with a far target and let them accelerate
     final target = Vector2(10000, 0);
-    heavy.pendingOrders.add(Order(
-      type: OrderType.moveTo,
-      issuedAt: 0,
-      arrivesAt: 0,
-      targetPosition: target,
-    ));
-    light.pendingOrders.add(Order(
-      type: OrderType.moveTo,
-      issuedAt: 0,
-      arrivesAt: 0,
-      targetPosition: target,
-    ));
+    heavy.activeOrder = Order(type: OrderType.moveTo, targetPosition: target);
+    light.activeOrder = Order(type: OrderType.moveTo, targetPosition: target);
 
     for (int i = 0; i < 100; i++) {
       system.update([heavy, light], 0.1);

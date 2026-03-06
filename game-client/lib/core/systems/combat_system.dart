@@ -63,7 +63,6 @@ class CombatSystem {
     for (final ship in state.ships.values) {
       if (ship.durability <= 0 && ship.isAlive) {
         ship.isAlive = false;
-        ship.pendingOrders.clear();
       }
     }
   }

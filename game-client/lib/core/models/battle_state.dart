@@ -1,5 +1,4 @@
 import 'ship_data.dart';
-import 'command_node.dart';
 
 enum TempoBand { distant, contact, engaged }
 
@@ -10,16 +9,19 @@ enum BattlePhase { setup, active, won, lost }
 /// Complete snapshot of a battle at a given simulation time.
 /// All game logic reads from and writes to this structure.
 class BattleState {
-  double battleTime;          // total elapsed battle time in seconds
+  double battleTime;        // total elapsed battle time in seconds
   BattlePhase phase;
 
-  final Map<String, ShipState> ships;           // keyed by instanceId
-  final Map<int, CommandTopology> topologies;   // keyed by factionId
+  final Map<String, ShipState> ships; // keyed by instanceId
 
+  /// Instance ID of the player's flagship. Used for win/loss and retreat orders.
+  final String playerFlagshipId;
+
+  /// Instance ID of the primary enemy flagship (win condition target).
+  final String? enemyFlagshipId;
+
+  /// Current tempo band — used by DoctrineAI to set update interval.
   TempoBand tempoBand;
-  double nextCommandPulse;    // battle time when the next command window opens
-  double commandWindowEnd;    // battle time when the current command window closes
-  //   double.infinity = window is open with no scheduled close (game start)
 
   final int playerFactionId;
   final String objectiveDescription;
@@ -30,12 +32,11 @@ class BattleState {
     required this.playerFactionId,
     required this.objectiveDescription,
     required this.ships,
-    required this.topologies,
+    required this.playerFlagshipId,
+    this.enemyFlagshipId,
     this.battleTime = 0.0,
     this.phase = BattlePhase.setup,
     this.tempoBand = TempoBand.distant,
-    this.nextCommandPulse = 0.0,
-    this.commandWindowEnd = double.infinity,
     this.winCondition,
     this.factionPostures = const {},
   });
@@ -49,15 +50,17 @@ class BattleState {
   List<ShipState> get aliveShips =>
       ships.values.where((s) => s.isAlive).toList();
 
-  Map<String, bool> get aliveMap =>
-      {for (final s in ships.values) s.instanceId: s.isAlive};
+  ShipState? get playerFlagship => ships[playerFlagshipId];
+
+  ShipState? get enemyFlagship =>
+      enemyFlagshipId != null ? ships[enemyFlagshipId] : null;
 }
 
 /// Describes win/loss conditions for a scenario.
 class WinCondition {
   final WinConditionType type;
-  final String? targetShipId;     // for 'destroy flagship'
-  final double? timeLimit;        // for 'survive X seconds'
+  final String? targetShipId;   // for 'destroyEnemyFlagship'
+  final double? timeLimit;      // for 'surviveUntilTime'
 
   const WinCondition({required this.type, this.targetShipId, this.timeLimit});
 }

@@ -1,12 +1,12 @@
 import 'dart:convert';
 
 import 'package:drift_command/core/models/battle_state.dart';
-import 'package:drift_command/core/models/command_node.dart';
 import 'package:drift_command/core/services/scenario_loader.dart';
 import 'package:drift_command/data/ships/ship_definitions.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-// Inline copy of scenario_001.json — no asset loading needed in unit tests.
+// Inline copy of scenario_001.json (legacy fields like commandNodeId are
+// silently ignored by the current loader).
 const _scenarioJson = '''
 {
   "id": "scenario_001",
@@ -20,45 +20,35 @@ const _scenarioJson = '''
   "ships": [
     {
       "instanceId": "p_flagship", "dataId": "flagship", "factionId": 0,
-      "position": [150, 300], "heading": 0,
-      "commandNodeId": "pf_node", "commandNodeType": "flagship"
+      "position": [150, 300], "heading": 0
     },
     {
       "instanceId": "p_relay", "dataId": "command_relay", "factionId": 0,
-      "position": [220, 240], "heading": 0,
-      "commandNodeId": "pr_node", "commandNodeType": "relay",
-      "parentNodeId": "pf_node"
+      "position": [220, 240], "heading": 0
     },
     {
       "instanceId": "p_heavy", "dataId": "heavy_line", "factionId": 0,
-      "position": [170, 360], "heading": 0,
-      "assignedCommandNodeId": "pr_node"
+      "position": [170, 360], "heading": 0
     },
     {
       "instanceId": "p_escort", "dataId": "light_escort", "factionId": 0,
-      "position": [200, 220], "heading": 0,
-      "assignedCommandNodeId": "pr_node"
+      "position": [200, 220], "heading": 0
     },
     {
       "instanceId": "e_flagship", "dataId": "flagship", "factionId": 1,
-      "position": [850, 300], "heading": 3.14159,
-      "commandNodeId": "ef_node", "commandNodeType": "flagship"
+      "position": [850, 300], "heading": 3.14159
     },
     {
       "instanceId": "e_relay", "dataId": "command_relay", "factionId": 1,
-      "position": [780, 360], "heading": 3.14159,
-      "commandNodeId": "er_node", "commandNodeType": "relay",
-      "parentNodeId": "ef_node"
+      "position": [780, 360], "heading": 3.14159
     },
     {
       "instanceId": "e_heavy", "dataId": "heavy_line", "factionId": 1,
-      "position": [830, 240], "heading": 3.14159,
-      "assignedCommandNodeId": "er_node"
+      "position": [830, 240], "heading": 3.14159
     },
     {
       "instanceId": "e_raider", "dataId": "fast_raider", "factionId": 1,
-      "position": [760, 290], "heading": 3.14159,
-      "assignedCommandNodeId": "er_node"
+      "position": [760, 290], "heading": 3.14159
     }
   ]
 }
@@ -86,25 +76,14 @@ void main() {
     expect(state.enemyShips.every((s) => s.factionId == 1), isTrue);
   });
 
-  test('command topology built for both factions', () {
-    expect(state.topologies.containsKey(0), isTrue);
-    expect(state.topologies.containsKey(1), isTrue);
+  test('playerFlagshipId points to the player flagship', () {
+    expect(state.playerFlagshipId, 'p_flagship');
+    expect(state.playerFlagship?.dataId, 'flagship');
   });
 
-  test('player topology has flagship and relay nodes', () {
-    final topo = state.topologies[0]!;
-    expect(topo.nodes.length, 2);
-    final flagship = topo.nodes[topo.flagshipNodeId]!;
-    expect(flagship.type, CommandNodeType.flagship);
-    expect(flagship.childNodeIds.length, 1);
-  });
-
-  test('relay node has two assigned combat ships', () {
-    final topo = state.topologies[0]!;
-    final relayNodeId = topo.flagship.childNodeIds.first;
-    final relay = topo.nodes[relayNodeId]!;
-    expect(relay.assignedCombatShipIds.length, 2);
-    expect(relay.assignedCombatShipIds, containsAll(['p_heavy', 'p_escort']));
+  test('enemyFlagshipId points to the enemy flagship', () {
+    expect(state.enemyFlagshipId, 'e_flagship');
+    expect(state.enemyFlagship?.dataId, 'flagship');
   });
 
   test('durability set from ShipData.maxDurability', () {
@@ -115,13 +94,6 @@ void main() {
     final raider = state.ships['e_raider']!;
     final raiderData = kShipDefinitions['fast_raider']!;
     expect(raider.durability, raiderData.maxDurability);
-  });
-
-  test('combat ships have assignedCommandNodeId set', () {
-    expect(state.ships['p_heavy']!.assignedCommandNodeId, 'pr_node');
-    expect(state.ships['p_escort']!.assignedCommandNodeId, 'pr_node');
-    expect(state.ships['e_heavy']!.assignedCommandNodeId, 'er_node');
-    expect(state.ships['e_raider']!.assignedCommandNodeId, 'er_node');
   });
 
   test('win condition is destroyEnemyFlagship targeting e_flagship', () {

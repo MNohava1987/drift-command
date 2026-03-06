@@ -65,11 +65,6 @@ class _TopBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       child: Row(
         children: [
-          ValueListenableBuilder<TempoBand>(
-            valueListenable: game.tempoBandNotifier,
-            builder: (_, band, _) => _TempoPill(band: band),
-          ),
-          const SizedBox(width: 12),
           ValueListenableBuilder<String>(
             valueListenable: game.battleTimeTextNotifier,
             builder: (_, text, _) => Text(
@@ -156,37 +151,6 @@ class _TopBar extends StatelessWidget {
   }
 }
 
-class _TempoPill extends StatelessWidget {
-  final TempoBand band;
-
-  const _TempoPill({required this.band});
-
-  @override
-  Widget build(BuildContext context) {
-    final (label, color) = switch (band) {
-      TempoBand.distant => ('DISTANT', const Color(0xFF4A90D9)),
-      TempoBand.contact => ('CONTACT', const Color(0xFFE8A030)),
-      TempoBand.engaged => ('ENGAGED', const Color(0xFFD94A4A)),
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withAlpha(220),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 11,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 1.2,
-        ),
-      ),
-    );
-  }
-}
-
 // ── Action bar ────────────────────────────────────────────────────────────────
 
 class _ActionBar extends StatelessWidget {
@@ -204,109 +168,30 @@ class _ActionBar extends StatelessWidget {
         if (ship.factionId != state.playerFactionId) {
           return const SizedBox.shrink();
         }
-        return ValueListenableBuilder<bool>(
-          valueListenable: game.commandPulseReadyNotifier,
-          builder: (_, pulseReady, _) {
-            return Container(
-              color: Colors.black.withAlpha(140),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  // Formation panel (only visible when fleet mode is on)
-                  ValueListenableBuilder<bool>(
-                    valueListenable: game.fleetModeNotifier,
-                    builder: (_, fleetOn, _) {
-                      if (!fleetOn) return const SizedBox.shrink();
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            const Text(
-                              'FORMATION:',
-                              style: TextStyle(
-                                color: Colors.white38,
-                                fontSize: 9,
-                                letterSpacing: 0.8,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            _FormationButton(label: 'WEDGE', game: game),
-                            const SizedBox(width: 4),
-                            _FormationButton(label: 'SCREEN', game: game),
-                            const SizedBox(width: 4),
-                            _FormationButton(label: 'DIAMOND', game: game),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      _SpeedSelector(game: game),
-                      const SizedBox(width: 12),
-                      // FLEET toggle
-                      ValueListenableBuilder<bool>(
-                        valueListenable: game.fleetModeNotifier,
-                        builder: (_, fleetOn, _) => GestureDetector(
-                          onTap: game.toggleFleetMode,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 5),
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                color: fleetOn
-                                    ? Colors.greenAccent
-                                    : Colors.white24,
-                              ),
-                              borderRadius: BorderRadius.circular(4),
-                              color: fleetOn
-                                  ? Colors.greenAccent.withAlpha(40)
-                                  : Colors.transparent,
-                            ),
-                            child: Text(
-                              'FLEET',
-                              style: TextStyle(
-                                color: fleetOn
-                                    ? Colors.greenAccent
-                                    : Colors.white38,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1.0,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      _CommandButton(
-                        label: 'HOLD',
-                        enabled: pulseReady,
-                        onPressed: game.issueHold,
-                      ),
-                      const SizedBox(width: 8),
-                      _CommandButton(
-                        label: 'RETREAT',
-                        enabled: pulseReady,
-                        onPressed: game.issueRetreat,
-                      ),
-                      const SizedBox(width: 8),
-                      _CommandButton(
-                        label: 'CANCEL',
-                        enabled: true,
-                        onPressed: game.cancelOrders,
-                      ),
-                      const SizedBox(width: 12),
-                      _PulseIndicator(ready: pulseReady),
-                    ],
-                  ),
-                ],
+        return Container(
+          color: Colors.black.withAlpha(140),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              _SpeedSelector(game: game),
+              const SizedBox(width: 12),
+              _CommandButton(
+                label: 'HOLD',
+                onPressed: game.issueHold,
               ),
-            );
-          },
+              const SizedBox(width: 8),
+              _CommandButton(
+                label: 'RETREAT',
+                onPressed: game.issueRetreat,
+              ),
+              const SizedBox(width: 8),
+              _CommandButton(
+                label: 'CANCEL',
+                onPressed: game.cancelOrders,
+              ),
+            ],
+          ),
         );
       },
     );
@@ -368,75 +253,34 @@ class _SpeedSelectorState extends State<_SpeedSelector> {
 
 class _CommandButton extends StatelessWidget {
   final String label;
-  final bool enabled;
   final VoidCallback onPressed;
 
   const _CommandButton({
     required this.label,
-    required this.enabled,
     required this.onPressed,
   });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: enabled ? onPressed : null,
+      onTap: onPressed,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
         decoration: BoxDecoration(
-          border: Border.all(
-            color: enabled
-                ? const Color(0xFF4A90D9)
-                : Colors.white24,
-          ),
+          border: Border.all(color: const Color(0xFF4A90D9)),
           borderRadius: BorderRadius.circular(4),
-          color: enabled
-              ? const Color(0xFF4A90D9).withAlpha(40)
-              : Colors.transparent,
+          color: const Color(0xFF4A90D9).withAlpha(40),
         ),
         child: Text(
           label,
-          style: TextStyle(
-            color: enabled ? Colors.white : Colors.white30,
+          style: const TextStyle(
+            color: Colors.white,
             fontSize: 11,
             fontWeight: FontWeight.bold,
             letterSpacing: 1.0,
           ),
         ),
       ),
-    );
-  }
-}
-
-class _PulseIndicator extends StatelessWidget {
-  final bool ready;
-
-  const _PulseIndicator({required this.ready});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 7,
-          height: 7,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: ready ? Colors.greenAccent : Colors.white24,
-          ),
-        ),
-        const SizedBox(width: 4),
-        Text(
-          ready ? 'CMD READY' : 'CMD WAIT',
-          style: TextStyle(
-            color: ready ? Colors.greenAccent : Colors.white30,
-            fontSize: 9,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 0.8,
-          ),
-        ),
-      ],
     );
   }
 }
@@ -458,7 +302,7 @@ class _ShipInfoBar extends StatelessWidget {
         if (ship.factionId != state.playerFactionId) {
           return const SizedBox.shrink();
         }
-        return _ShipPanel(ship: ship, state: state, game: game);
+        return _ShipPanel(ship: ship, game: game);
       },
     );
   }
@@ -466,18 +310,12 @@ class _ShipInfoBar extends StatelessWidget {
 
 class _ShipPanel extends StatelessWidget {
   final ShipState ship;
-  final BattleState state;
   final BattleGame game;
 
-  const _ShipPanel({required this.ship, required this.state, required this.game});
+  const _ShipPanel({required this.ship, required this.game});
 
   @override
   Widget build(BuildContext context) {
-    final topology = state.topologies[ship.factionId];
-    final tier = topology != null
-        ? topology.connectivityTier(ship, state.ships)
-        : 0;
-
     return Container(
       color: Colors.black.withAlpha(170),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -504,11 +342,9 @@ class _ShipPanel extends StatelessWidget {
           const SizedBox(width: 16),
           _DurabilityBar(ship: ship),
           const SizedBox(width: 16),
-          _RelayStatus(tier: tier),
-          const SizedBox(width: 16),
           _ModeToggle(ship: ship),
           const SizedBox(width: 16),
-          _OrderQueue(ship: ship, game: game),
+          _OrderDisplay(ship: ship, game: game),
         ],
       ),
     );
@@ -550,37 +386,6 @@ class _DurabilityBar extends StatelessWidget {
                 child: Container(color: barColor),
               ),
             ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _RelayStatus extends StatelessWidget {
-  /// 2 = direct, 1 = relay, 0 = isolated
-  final int tier;
-
-  const _RelayStatus({required this.tier});
-
-  @override
-  Widget build(BuildContext context) {
-    final (label, color, icon) = switch (tier) {
-      2 => ('DIRECT', Colors.greenAccent, Icons.link),
-      1 => ('RELAY', Colors.amber, Icons.link),
-      _ => ('ISOLATED', Colors.redAccent, Icons.link_off),
-    };
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, color: color, size: 14),
-        const SizedBox(width: 4),
-        Text(
-          label,
-          style: TextStyle(
-            color: color,
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
           ),
         ),
       ],
@@ -637,35 +442,61 @@ class _ModeToggleState extends State<_ModeToggle> {
   }
 }
 
-class _FormationButton extends StatelessWidget {
-  final String label;
+// ── Order display ─────────────────────────────────────────────────────────────
+
+class _OrderDisplay extends StatelessWidget {
+  final ShipState ship;
   final BattleGame game;
 
-  const _FormationButton({required this.label, required this.game});
+  const _OrderDisplay({required this.ship, required this.game});
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => game.applyFormation(label),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.greenAccent.withAlpha(120)),
-          borderRadius: BorderRadius.circular(4),
-          color: Colors.greenAccent.withAlpha(15),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(
-            color: Colors.greenAccent,
-            fontSize: 9,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 0.8,
-          ),
-        ),
-      ),
+    return ValueListenableBuilder<String>(
+      valueListenable: game.battleTimeTextNotifier,
+      builder: (_, _, _) {
+        final active = ship.activeOrder;
+
+        if (active == null) {
+          return const Text(
+            'COASTING',
+            style: TextStyle(color: Colors.white24, fontSize: 10),
+          );
+        }
+
+        final label = _labelForOrderType(active.type);
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+              color: const Color(0xFF00FFFF).withAlpha(30),
+              child: const Text(
+                'ACT',
+                style: TextStyle(
+                  color: Color(0xFF00FFFF),
+                  fontSize: 9,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: const TextStyle(color: Colors.white70, fontSize: 10),
+            ),
+          ],
+        );
+      },
     );
   }
+
+  String _labelForOrderType(OrderType type) => switch (type) {
+        OrderType.moveTo => 'MOVE',
+        OrderType.attackTarget => 'ATTACK',
+        OrderType.hold => 'HOLD',
+        OrderType.retreat => 'RETREAT',
+      };
 }
 
 // ── Time scale selector ────────────────────────────────────────────────────────
@@ -737,114 +568,6 @@ class _TimeScaleSelector extends StatelessWidget {
       },
     );
   }
-}
-
-// ── Order queue ────────────────────────────────────────────────────────────────
-
-class _OrderQueue extends StatelessWidget {
-  final ShipState ship;
-  final BattleGame game;
-
-  const _OrderQueue({required this.ship, required this.game});
-
-  @override
-  Widget build(BuildContext context) {
-    return ValueListenableBuilder<String>(
-      valueListenable: game.battleTimeTextNotifier,
-      builder: (_, _, _) {
-        final battleTime = game.battleStateOrNull?.battleTime ?? 0.0;
-        final active = ship.activeOrder;
-        final pending = ship.pendingOrders;
-
-        if (active == null && pending.isEmpty) {
-          return const Text(
-            'COASTING',
-            style: TextStyle(color: Colors.white24, fontSize: 10),
-          );
-        }
-
-        final lines = <Widget>[];
-        if (active != null) {
-          lines.add(_orderLine(active, battleTime, isActive: true));
-        }
-        for (final order in pending.take(2)) {
-          lines.add(_orderLine(order, battleTime, isActive: false));
-        }
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: lines,
-        );
-      },
-    );
-  }
-
-  Widget _orderLine(Order order, double battleTime, {required bool isActive}) {
-    final label = _labelForOrderType(order.type);
-    if (isActive) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-            color: const Color(0xFF00FFFF).withAlpha(30),
-            child: const Text(
-              'ACT',
-              style: TextStyle(
-                color: Color(0xFF00FFFF),
-                fontSize: 9,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(color: Colors.white70, fontSize: 10),
-          ),
-        ],
-      );
-    } else {
-      final wait = (order.arrivesAt - battleTime).clamp(0.0, double.infinity);
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-            color: Colors.white.withAlpha(10),
-            child: const Text(
-              'QUE',
-              style: TextStyle(
-                color: Colors.white38,
-                fontSize: 9,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          const SizedBox(width: 4),
-          Text(
-            '${wait.toStringAsFixed(1)}s',
-            style: const TextStyle(color: Colors.amber, fontSize: 9),
-          ),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: const TextStyle(color: Colors.white54, fontSize: 10),
-          ),
-        ],
-      );
-    }
-  }
-
-  String _labelForOrderType(OrderType type) => switch (type) {
-        OrderType.moveTo => 'MOVE',
-        OrderType.attackTarget => 'ATTACK',
-        OrderType.hold => 'HOLD',
-        OrderType.retreat => 'RETREAT',
-        OrderType.screen => 'SCREEN',
-        OrderType.relay => 'RELAY',
-      };
 }
 
 // ── Pause menu ────────────────────────────────────────────────────────────────

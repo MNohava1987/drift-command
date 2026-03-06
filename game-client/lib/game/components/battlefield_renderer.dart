@@ -257,9 +257,7 @@ class BattlefieldRenderer extends Component {
   // ── Sensor ghost ─────────────────────────────────────────────────────────
 
   void _drawSensorGhosts(Canvas canvas, BattleState state) {
-    final playerTopology = state.topologies[state.playerFactionId];
-    final flagshipId = playerTopology?.flagship.shipInstanceId;
-    final playerFlagship = flagshipId != null ? state.ships[flagshipId] : null;
+    final playerFlagship = state.playerFlagship;
     if (playerFlagship == null) return;
 
     for (final ship in state.ships.values) {
@@ -565,29 +563,6 @@ class BattlefieldRenderer extends Component {
         lastWaypoint = to;
       }
 
-      // Pending waypoints: only for selected ship, drawn as a connected chain.
-      // This shows the full planned route: ship → wp1 → wp2 → wp3 …
-      if (ship == selectedShip && ship.pendingOrders.isNotEmpty) {
-        final pendingPaint = Paint()
-          ..color = const Color(0xFFFFDD44).withAlpha(180)
-          ..strokeWidth = 1.0;
-        final dotPaint = Paint()
-          ..color = const Color(0xFFFFDD44).withAlpha(200)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.2;
-
-        Offset chainFrom = lastWaypoint ?? so;
-        for (final order in ship.pendingOrders) {
-          if (order.targetPosition == null) continue;
-          final tc = worldToCanvas(order.targetPosition!);
-          final to = Offset(tc.x, tc.y);
-          _drawDashedLine(canvas, chainFrom, to, pendingPaint,
-              dashLength: 5.0, gapLength: 4.0);
-          // Waypoint circle marker
-          canvas.drawCircle(to, 5.0, dotPaint);
-          chainFrom = to;
-        }
-      }
     }
   }
 
@@ -665,14 +640,6 @@ class BattlefieldRenderer extends Component {
   }
 
   ShipRole _roleForShip(ShipState ship, BattleState state) {
-    final topology = state.topologies[ship.factionId];
-    if (topology != null) {
-      for (final node in topology.nodes.values) {
-        if (node.shipInstanceId == ship.instanceId) {
-          return node.isRoot ? ShipRole.flagship : ShipRole.commandRelay;
-        }
-      }
-    }
     return kShipDefinitions[ship.dataId]?.role ?? ShipRole.lightEscort;
   }
 
@@ -741,36 +708,20 @@ class BattlefieldRenderer extends Component {
   // ── Command chain lines ────────────────────────────────────────────────────
 
   void _drawCommandChainLines(Canvas canvas, BattleState state) {
-    final topology = state.topologies[state.playerFactionId];
-    if (topology == null) return;
-    final flagship = state.ships[topology.flagship.shipInstanceId];
+    final flagship = state.playerFlagship;
     if (flagship == null || !flagship.isAlive) return;
 
     final flagshipC = worldToCanvas(flagship.position);
     final flagshipO = Offset(flagshipC.x, flagshipC.y);
 
-    final flagshipToRelayPaint = Paint()
-      ..color = const Color(0x26FFFFFF)
-      ..strokeWidth = 1.0;
-    final relayToCombatPaint = Paint()
+    final linePaint = Paint()
       ..color = const Color(0x1AFFFFFF)
       ..strokeWidth = 0.8;
 
-    for (final node in topology.nodes.values) {
-      if (node.isRoot) continue;
-      final relay = state.ships[node.shipInstanceId];
-      if (relay == null || !relay.isAlive) continue;
-
-      final relayC = worldToCanvas(relay.position);
-      final relayO = Offset(relayC.x, relayC.y);
-      canvas.drawLine(flagshipO, relayO, flagshipToRelayPaint);
-
-      for (final combatId in node.assignedCombatShipIds) {
-        final combat = state.ships[combatId];
-        if (combat == null || !combat.isAlive) continue;
-        final combatC = worldToCanvas(combat.position);
-        canvas.drawLine(relayO, Offset(combatC.x, combatC.y), relayToCombatPaint);
-      }
+    for (final ship in state.playerShips) {
+      if (!ship.isAlive || ship.instanceId == flagship.instanceId) continue;
+      final shipC = worldToCanvas(ship.position);
+      canvas.drawLine(flagshipO, Offset(shipC.x, shipC.y), linePaint);
     }
   }
 
