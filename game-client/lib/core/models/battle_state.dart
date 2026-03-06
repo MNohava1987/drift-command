@@ -17,7 +17,9 @@ class BattleState {
   final Map<int, CommandTopology> topologies;   // keyed by factionId
 
   TempoBand tempoBand;
-  double nextCommandPulse;    // battle time of next allowed command pulse
+  double nextCommandPulse;    // battle time when the next command window opens
+  double commandWindowEnd;    // battle time when the current command window closes
+  //   double.infinity = window is open with no scheduled close (game start)
 
   final int playerFactionId;
   final String objectiveDescription;
@@ -33,6 +35,7 @@ class BattleState {
     this.phase = BattlePhase.setup,
     this.tempoBand = TempoBand.distant,
     this.nextCommandPulse = 0.0,
+    this.commandWindowEnd = double.infinity,
     this.winCondition,
     this.factionPostures = const {},
   });

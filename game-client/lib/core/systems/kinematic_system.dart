@@ -136,17 +136,17 @@ class KinematicSystem {
     }
 
     if (stopAtTarget) {
-      // Stopping distance: v² / (2a). Add 20% safety margin.
-      final stoppingDist =
-          (currentSpeed * currentSpeed) / (2 * data.maxAcceleration + 0.001);
-
-      if (distance <= stoppingDist * 1.2 || distance < 8.0) {
-        _applyBraking(ship, data, dt);
-        return false;
-      }
+      // Proportional speed cap: limit approach speed so the ship eases in
+      // smoothly rather than rushing to full speed then slamming the brakes.
+      // safeSpeed = sqrt(2 * a * distance * 0.8) — at safe speed, ship can
+      // stop within the remaining distance with a small margin.
+      final safeApproachSpeed =
+          math.sqrt(2.0 * data.maxAcceleration * distance * 0.8 + 0.01);
+      _steerToward(ship, data, target, dt, math.min(maxSpeed, safeApproachSpeed));
+      return false;
     }
 
-    // Accelerate toward target, capped at maxSpeed
+    // Fly-through: accelerate toward target, capped at maxSpeed
     _steerToward(ship, data, target, dt, maxSpeed);
     return false;
   }

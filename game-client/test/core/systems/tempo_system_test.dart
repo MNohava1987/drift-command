@@ -108,16 +108,25 @@ void main() {
     expect(system.isCommandPulseReady(state), isTrue);
   });
 
-  test('advanceCommandPulse closes the window', () {
+  test('advanceCommandPulse opens a timed window; multiple orders stay open', () {
     final state = _makeBattleState(
       playerPos: Vector2(0, 0),
-      enemyPos: Vector2(1000, 0),
+      enemyPos: Vector2(1000, 0), // distant band
     );
     final system = TempoSystem();
     system.update(state, 0.016);
     expect(system.isCommandPulseReady(state), isTrue);
 
+    // First order: transitions from infinite → timed window
     system.advanceCommandPulse(state);
+    expect(system.isCommandPulseReady(state), isTrue); // still open
+
+    // Second order in same window: no-op, window stays open
+    system.advanceCommandPulse(state);
+    expect(system.isCommandPulseReady(state), isTrue);
+
+    // Window closes after kWindowDuration[distant] = 6.0 seconds
+    system.update(state, kWindowDuration[TempoBand.distant]! + 0.1);
     expect(system.isCommandPulseReady(state), isFalse);
   });
 

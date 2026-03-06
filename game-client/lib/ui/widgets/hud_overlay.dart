@@ -548,6 +548,7 @@ class _TimeScaleSelector extends StatelessWidget {
   const _TimeScaleSelector({required this.game});
 
   static const _scales = [
+    (label: '0×', value: 0.0),
     (label: '0.5×', value: 0.5),
     (label: '1×', value: 1.0),
     (label: '2×', value: 2.0),
