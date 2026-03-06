@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'game_screen.dart';
+import 'deployment_screen.dart';
 import 'tutorial_screen.dart';
 
 /// Scenario metadata for the picker UI.
@@ -131,7 +131,7 @@ class _ScenarioPickerScreenState extends State<ScenarioPickerScreen> {
                     onTap: () async {
                       await Navigator.of(context).pushReplacement(
                         MaterialPageRoute(
-                          builder: (_) => GameScreen(
+                          builder: (_) => DeploymentScreen(
                             scenarioId: s.id,
                             scenarioAssetPath: s.assetPath,
                           ),

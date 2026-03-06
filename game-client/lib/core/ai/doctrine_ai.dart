@@ -1,15 +1,16 @@
-import 'dart:math' as math;
 import 'package:flame/components.dart';
 import '../models/ship_data.dart';
 import '../models/battle_state.dart';
+import '../models/squad.dart';
 import '../systems/command_system.dart';
+import '../systems/engagement_system.dart';
 
 /// Doctrine-driven AI for enemy factions.
-/// Re-evaluates on an interval scaled to the current tempo band.
+/// Operates at squad level. Re-evaluates on an interval scaled to tempo band.
 class DoctrineAI {
   final CommandSystem commandSystem;
+  final EngagementSystem engagementSystem;
   final Map<String, ShipData> registry;
-  final math.Random _rng;
 
   double _nextAIUpdate = 0;
 
@@ -21,204 +22,120 @@ class DoctrineAI {
 
   DoctrineAI({
     required this.commandSystem,
+    required this.engagementSystem,
     required this.registry,
-    math.Random? rng,
-  }) : _rng = rng ?? math.Random();
+  });
 
   void update(BattleState state, double dt) {
     if (state.battleTime < _nextAIUpdate) return;
-    _nextAIUpdate = state.battleTime + (_aiInterval[state.tempoBand] ?? 3.0);
+    _nextAIUpdate =
+        state.battleTime + (_aiInterval[state.tempoBand] ?? 3.0);
 
-    final factionIds = state.ships.values
-        .map((s) => s.factionId)
+    // Set ShipMode on all ships based on faction posture
+    for (final ship in state.ships.values) {
+      if (!ship.isAlive || ship.factionId == state.playerFactionId) continue;
+      final posture =
+          state.factionPostures[ship.factionId] ?? AiPosture.aggressive;
+      ship.shipMode =
+          (posture == AiPosture.aggressive || posture == AiPosture.flanking)
+              ? ShipMode.attack
+              : ShipMode.defensive;
+    }
+
+    // Squad-level posture orders for each enemy faction
+    final factionIds = state.squads.values
+        .map((sq) => sq.factionId)
         .toSet()
         .where((id) => id != state.playerFactionId);
 
     for (final factionId in factionIds) {
       _runFactionAI(state, factionId);
     }
+
+    // Engagement system handles contact-range behaviour for ENGAGE/GHOST squads
+    engagementSystem.update(state);
   }
 
   void _runFactionAI(BattleState state, int factionId) {
-    final myShips = state.ships.values
-        .where((s) => s.factionId == factionId && s.isAlive)
+    final mySquads = state.squads.values
+        .where((sq) => sq.factionId == factionId && state.squadIsAlive(sq))
         .toList();
 
-    final playerShips = state.playerShips.where((s) => s.isAlive).toList();
-    if (playerShips.isEmpty) return;
+    final playerFlagshipSquad = state.playerFlagshipSquad;
+    if (playerFlagshipSquad == null || !state.squadIsAlive(playerFlagshipSquad)) {
+      // No alive player flagship squad — skip (player already losing)
+      return;
+    }
 
-    final playerFlagship = state.playerFlagship?.isAlive == true
-        ? state.playerFlagship
-        : playerShips.firstOrNull;
+    final posture =
+        state.factionPostures[factionId] ?? AiPosture.aggressive;
 
-    final myFlagship = _findFlagship(state, factionId);
-    final posture = state.factionPostures[factionId] ?? AiPosture.aggressive;
-
-    for (final ship in myShips) {
-      final data = registry[ship.dataId];
-      if (data == null) continue;
-
-      ship.shipMode = (posture == AiPosture.aggressive || posture == AiPosture.flanking)
-          ? ShipMode.attack
-          : ShipMode.defensive;
-
-      _applyShipDoctrine(
+    for (final squad in mySquads) {
+      _applySquadPosture(
         state: state,
-        ship: ship,
-        data: data,
-        factionId: factionId,
-        playerShips: playerShips,
-        playerFlagship: playerFlagship,
-        myFlagship: myFlagship,
+        squad: squad,
         posture: posture,
+        playerFlagshipSquad: playerFlagshipSquad,
       );
     }
   }
 
-  void _applyShipDoctrine({
+  void _applySquadPosture({
     required BattleState state,
-    required ShipState ship,
-    required ShipData data,
-    required int factionId,
-    required List<ShipState> playerShips,
-    required ShipState? playerFlagship,
-    required ShipState? myFlagship,
+    required SquadState squad,
     required AiPosture posture,
+    required SquadState playerFlagshipSquad,
   }) {
-    if (_applyPostureOverride(ship, data, posture, state, playerShips, playerFlagship)) return;
+    final leaderShipId = playerFlagshipSquad.shipInstanceIds.firstOrNull;
+    final leaderShip =
+        leaderShipId != null ? state.ships[leaderShipId] : null;
 
-    switch (data.role) {
-      case ShipRole.flagship:
-        if (_isThreatened(ship, state)) {
-          _issueRetreat(state, ship, myFlagship);
-        }
-
-      // commandRelay treated as light escort — screens the flagship
-      case ShipRole.commandRelay:
-      case ShipRole.lightEscort:
-        if (myFlagship != null) {
-          final screenPos = myFlagship.position +
-              Vector2(_rng.nextDouble() * 60 - 30, _rng.nextDouble() * 60 - 30);
-          _issueMove(state, ship, screenPos);
-        }
-
-      case ShipRole.heavyLine:
-        final target = playerFlagship ?? playerShips.first;
-        _issueAttack(state, ship, target);
-
-      case ShipRole.fastRaider:
-        if (playerShips.isNotEmpty) {
-          _issueAttack(state, ship, playerShips.first);
-        }
-
-      case ShipRole.strikeCarrier:
-        if (playerShips.isNotEmpty) {
-          final target = playerShips.first;
-          final dist = ship.position.distanceTo(target.position);
-          if (dist > 200) {
-            _issueAttack(state, ship, target);
-          } else {
-            _issueRetreat(state, ship, myFlagship);
-          }
-        }
-    }
-  }
-
-  bool _applyPostureOverride(
-    ShipState ship,
-    ShipData data,
-    AiPosture posture,
-    BattleState state,
-    List<ShipState> playerShips,
-    ShipState? playerFlagship,
-  ) {
     switch (posture) {
       case AiPosture.aggressive:
-        return false;
+        if (leaderShip != null && leaderShip.isAlive) {
+          commandSystem.issueSquadOrder(
+            state: state,
+            squadId: squad.squadId,
+            orderType: OrderType.attackTarget,
+            targetPosition: leaderShip.position.clone(),
+            targetEnemyId: leaderShip.instanceId,
+          );
+        }
 
       case AiPosture.defensive:
-        final nearEnemy = playerShips.any(
-          (p) => p.position.distanceTo(ship.position) <= data.weaponRange,
+        final nearPlayer = state.playerSquads.any(
+          (psq) =>
+              state.squadIsAlive(psq) &&
+              psq.centroid.distanceTo(squad.centroid) <= 200,
         );
-        if (!nearEnemy) {
-          _issueHold(state, ship);
+        if (!nearPlayer) {
+          commandSystem.issueSquadOrder(
+            state: state,
+            squadId: squad.squadId,
+            orderType: OrderType.hold,
+          );
         }
-        return true;
 
       case AiPosture.flanking:
-        if (data.role == ShipRole.heavyLine || data.role == ShipRole.flagship) {
-          if (playerFlagship != null) {
-            _issueAttack(state, ship, playerFlagship);
-          } else if (playerShips.isNotEmpty) {
-            _issueAttack(state, ship, playerShips.first);
-          }
-        } else if (playerFlagship != null) {
-          final toFlagship = playerFlagship.position - ship.position;
-          final perp = Vector2(-toFlagship.y, toFlagship.x).normalized() *
-              (data.weaponRange * 0.8);
-          final flankPos = playerFlagship.position + perp;
-          _issueMove(state, ship, flankPos);
-        } else if (playerShips.isNotEmpty) {
-          _issueAttack(state, ship, playerShips.first);
+        // Move to 150 units lateral from player flagship centroid
+        final toFlagship =
+            playerFlagshipSquad.centroid - squad.centroid;
+        if (toFlagship.length > 0.1) {
+          final perp = Vector2(-toFlagship.y, toFlagship.x).normalized() * 150;
+          commandSystem.issueSquadOrder(
+            state: state,
+            squadId: squad.squadId,
+            orderType: OrderType.moveTo,
+            targetPosition: playerFlagshipSquad.centroid + perp,
+          );
         }
-        return true;
 
       case AiPosture.holdAndFire:
-        _issueHold(state, ship);
-        return true;
+        commandSystem.issueSquadOrder(
+          state: state,
+          squadId: squad.squadId,
+          orderType: OrderType.hold,
+        );
     }
-  }
-
-  bool _isThreatened(ShipState ship, BattleState state) {
-    return state.playerShips.any(
-      (p) => p.isAlive && p.position.distanceTo(ship.position) < 80,
-    );
-  }
-
-  ShipState? _findFlagship(BattleState state, int factionId) {
-    return state.ships.values.firstWhere(
-      (s) => s.factionId == factionId && s.isAlive &&
-          (registry[s.dataId]?.role == ShipRole.flagship),
-      orElse: () => state.ships.values.firstWhere(
-        (s) => s.factionId == factionId && s.isAlive,
-        orElse: () => state.ships.values.first,
-      ),
-    );
-  }
-
-  void _issueMove(BattleState state, ShipState ship, Vector2 target) {
-    commandSystem.issueOrder(
-      state: state,
-      targetShipId: ship.instanceId,
-      orderType: OrderType.moveTo,
-      targetPosition: target,
-    );
-  }
-
-  void _issueAttack(BattleState state, ShipState ship, ShipState target) {
-    commandSystem.issueOrder(
-      state: state,
-      targetShipId: ship.instanceId,
-      orderType: OrderType.attackTarget,
-      targetPosition: target.position,
-      targetEnemyId: target.instanceId,
-    );
-  }
-
-  void _issueRetreat(BattleState state, ShipState ship, ShipState? myFlagship) {
-    commandSystem.issueOrder(
-      state: state,
-      targetShipId: ship.instanceId,
-      orderType: OrderType.retreat,
-      targetPosition: myFlagship?.position,
-    );
-  }
-
-  void _issueHold(BattleState state, ShipState ship) {
-    commandSystem.issueOrder(
-      state: state,
-      targetShipId: ship.instanceId,
-      orderType: OrderType.hold,
-    );
   }
 }

@@ -14,19 +14,6 @@ const kShipDefinitions = <String, ShipData>{
     maxDurability: 200.0,
     roleTags: [RoleTag.directFire],
   ),
-  // command_relay kept for scenario backward-compat; behaves as a light escort.
-  'command_relay': ShipData(
-    id: 'command_relay',
-    displayName: 'Relay Ship',
-    role: ShipRole.commandRelay,
-    massClass: MassClass.medium,
-    maxAcceleration: 18.0,
-    turnRate: 0.8,
-    sensorRange: 350.0,
-    weaponRange: 80.0,
-    maxDurability: 80.0,
-    roleTags: [RoleTag.directFire],
-  ),
   'heavy_line': ShipData(
     id: 'heavy_line',
     displayName: 'Heavy Line Ship',

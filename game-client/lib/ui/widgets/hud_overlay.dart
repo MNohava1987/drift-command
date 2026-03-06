@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../core/models/battle_state.dart';
 import '../../core/models/ship_data.dart';
+import '../../core/models/squad.dart';
 import '../../data/ships/ship_definitions.dart';
 import '../../game/battle_game.dart';
 
@@ -32,7 +32,7 @@ class HudOverlay extends StatelessWidget {
             _TopBar(game: game),
             const Spacer(),
             _ActionBar(game: game),
-            _ShipInfoBar(game: game),
+            _SquadInfoBar(game: game),
           ],
         ),
         ValueListenableBuilder<bool>(
@@ -160,12 +160,12 @@ class _ActionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<ShipState?>(
-      valueListenable: game.selectedShipNotifier,
-      builder: (_, ship, _) {
+    return ValueListenableBuilder<SquadState?>(
+      valueListenable: game.selectedSquadNotifier,
+      builder: (_, squad, _) {
         final state = game.battleStateOrNull;
-        if (ship == null || state == null) return const SizedBox.shrink();
-        if (ship.factionId != state.playerFactionId) {
+        if (squad == null || state == null) return const SizedBox.shrink();
+        if (squad.factionId != state.playerFactionId) {
           return const SizedBox.shrink();
         }
         return Container(
@@ -285,37 +285,53 @@ class _CommandButton extends StatelessWidget {
   }
 }
 
-// ── Ship info bar ─────────────────────────────────────────────────────────────
+// ── Squad info bar ────────────────────────────────────────────────────────────
 
-class _ShipInfoBar extends StatelessWidget {
+class _SquadInfoBar extends StatelessWidget {
   final BattleGame game;
 
-  const _ShipInfoBar({required this.game});
+  const _SquadInfoBar({required this.game});
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<ShipState?>(
-      valueListenable: game.selectedShipNotifier,
-      builder: (_, ship, _) {
+    return ValueListenableBuilder<SquadState?>(
+      valueListenable: game.selectedSquadNotifier,
+      builder: (_, squad, _) {
         final state = game.battleStateOrNull;
-        if (ship == null || state == null) return const SizedBox.shrink();
-        if (ship.factionId != state.playerFactionId) {
+        if (squad == null || state == null) return const SizedBox.shrink();
+        if (squad.factionId != state.playerFactionId) {
           return const SizedBox.shrink();
         }
-        return _ShipPanel(ship: ship, game: game);
+        return _SquadPanel(squad: squad, game: game);
       },
     );
   }
 }
 
-class _ShipPanel extends StatelessWidget {
-  final ShipState ship;
+class _SquadPanel extends StatelessWidget {
+  final SquadState squad;
   final BattleGame game;
 
-  const _ShipPanel({required this.ship, required this.game});
+  const _SquadPanel({required this.squad, required this.game});
+
+  String _squadTypeLabel(SquadType type) => switch (type) {
+        SquadType.flagship => 'FLAGSHIP',
+        SquadType.lineDivision => 'LINE DIV',
+        SquadType.raidPack => 'RAID PACK',
+        SquadType.carrierStrike => 'CARRIER',
+        SquadType.escortScreen => 'ESCORT',
+      };
 
   @override
   Widget build(BuildContext context) {
+    final state = game.battleStateOrNull;
+    if (state == null) return const SizedBox.shrink();
+
+    final aliveCount = squad.shipInstanceIds
+        .where((id) => state.ships[id]?.isAlive == true)
+        .length;
+    final totalCount = squad.shipInstanceIds.length;
+
     return Container(
       color: Colors.black.withAlpha(170),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -326,7 +342,7 @@ class _ShipPanel extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                ship.instanceId.replaceAll('_', ' ').toUpperCase(),
+                _squadTypeLabel(squad.type),
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 13,
@@ -334,93 +350,115 @@ class _ShipPanel extends StatelessWidget {
                 ),
               ),
               Text(
-                ship.dataId.replaceAll('_', ' '),
+                '$aliveCount/$totalCount ships',
                 style: const TextStyle(color: Colors.white54, fontSize: 11),
               ),
             ],
           ),
           const SizedBox(width: 16),
-          _DurabilityBar(ship: ship),
+          _AggregateDurabilityBar(squad: squad, game: game),
           const SizedBox(width: 16),
-          _ModeToggle(ship: ship),
+          _EngagementModeToggle(squad: squad, game: game),
           const SizedBox(width: 16),
-          _OrderDisplay(ship: ship, game: game),
+          _SquadOrderDisplay(squad: squad, game: game),
         ],
       ),
     );
   }
 }
 
-class _DurabilityBar extends StatelessWidget {
-  final ShipState ship;
+class _AggregateDurabilityBar extends StatelessWidget {
+  final SquadState squad;
+  final BattleGame game;
 
-  const _DurabilityBar({required this.ship});
+  const _AggregateDurabilityBar({required this.squad, required this.game});
 
   @override
   Widget build(BuildContext context) {
-    final maxDur = kShipDefinitions[ship.dataId]?.maxDurability ?? 100.0;
-    final frac = (ship.durability / maxDur).clamp(0.0, 1.0);
-    final barColor = frac > 0.5
-        ? Colors.greenAccent
-        : frac > 0.25
-            ? Colors.orange
-            : Colors.redAccent;
+    return ValueListenableBuilder<String>(
+      valueListenable: game.battleTimeTextNotifier,
+      builder: (_, _, _) {
+        final state = game.battleStateOrNull;
+        if (state == null) return const SizedBox.shrink();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          'HP ${ship.durability.toStringAsFixed(0)}',
-          style: const TextStyle(color: Colors.white60, fontSize: 10),
-        ),
-        const SizedBox(height: 2),
-        SizedBox(
-          width: 80,
-          height: 6,
-          child: Stack(
-            children: [
-              Container(color: Colors.white12),
-              FractionallySizedBox(
-                widthFactor: frac,
-                child: Container(color: barColor),
+        var totalHp = 0.0;
+        var totalMax = 0.0;
+        for (final id in squad.shipInstanceIds) {
+          final ship = state.ships[id];
+          if (ship == null || !ship.isAlive) continue;
+          totalHp += ship.durability;
+          final data = kShipDefinitions[ship.dataId];
+          if (data != null) totalMax += data.maxDurability;
+        }
+
+        if (totalMax == 0) return const SizedBox.shrink();
+        final frac = (totalHp / totalMax).clamp(0.0, 1.0);
+        final barColor = frac > 0.5
+            ? Colors.greenAccent
+            : frac > 0.25
+                ? Colors.orange
+                : Colors.redAccent;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'HP ${totalHp.toStringAsFixed(0)}/${totalMax.toStringAsFixed(0)}',
+              style: const TextStyle(color: Colors.white60, fontSize: 10),
+            ),
+            const SizedBox(height: 2),
+            SizedBox(
+              width: 80,
+              height: 6,
+              child: Stack(
+                children: [
+                  Container(color: Colors.white12),
+                  FractionallySizedBox(
+                    widthFactor: frac,
+                    child: Container(color: barColor),
+                  ),
+                ],
               ),
-            ],
-          ),
-        ),
-      ],
+            ),
+          ],
+        );
+      },
     );
   }
 }
 
-class _ModeToggle extends StatefulWidget {
-  final ShipState ship;
+class _EngagementModeToggle extends StatefulWidget {
+  final SquadState squad;
+  final BattleGame game;
 
-  const _ModeToggle({required this.ship});
+  const _EngagementModeToggle({required this.squad, required this.game});
 
   @override
-  State<_ModeToggle> createState() => _ModeToggleState();
+  State<_EngagementModeToggle> createState() => _EngagementModeToggleState();
 }
 
-class _ModeToggleState extends State<_ModeToggle> {
+class _EngagementModeToggleState extends State<_EngagementModeToggle> {
   @override
   Widget build(BuildContext context) {
-    final mode = widget.ship.shipMode;
+    final mode = widget.squad.engagementMode;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _modeBtn('DEF', ShipMode.defensive,
-            const Color(0xFF4A90D9), mode == ShipMode.defensive),
+        _modeBtn('D', EngagementMode.direct, const Color(0xFF00CCCC), mode == EngagementMode.direct),
         const SizedBox(width: 4),
-        _modeBtn('ATK', ShipMode.attack,
-            const Color(0xFFD94A3A), mode == ShipMode.attack),
+        _modeBtn('E', EngagementMode.engage, const Color(0xFFD94A3A), mode == EngagementMode.engage),
+        const SizedBox(width: 4),
+        _modeBtn('G', EngagementMode.ghost, const Color(0xFF9999CC), mode == EngagementMode.ghost),
       ],
     );
   }
 
-  Widget _modeBtn(String label, ShipMode mode, Color color, bool selected) {
+  Widget _modeBtn(String label, EngagementMode mode, Color color, bool selected) {
     return GestureDetector(
-      onTap: () => setState(() => widget.ship.shipMode = mode),
+      onTap: () => setState(() {
+        widget.game.setEngagementMode(widget.squad.squadId, mode);
+      }),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
@@ -442,20 +480,20 @@ class _ModeToggleState extends State<_ModeToggle> {
   }
 }
 
-// ── Order display ─────────────────────────────────────────────────────────────
+// ── Squad order display ───────────────────────────────────────────────────────
 
-class _OrderDisplay extends StatelessWidget {
-  final ShipState ship;
+class _SquadOrderDisplay extends StatelessWidget {
+  final SquadState squad;
   final BattleGame game;
 
-  const _OrderDisplay({required this.ship, required this.game});
+  const _SquadOrderDisplay({required this.squad, required this.game});
 
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<String>(
       valueListenable: game.battleTimeTextNotifier,
       builder: (_, _, _) {
-        final active = ship.activeOrder;
+        final active = squad.activeOrder;
 
         if (active == null) {
           return const Text(

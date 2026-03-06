@@ -3,81 +3,15 @@
   "name": "First Contact",
   "objective": "Destroy the enemy flagship",
   "playerFactionId": 0,
-  "factionPostures": {"1": "aggressive"},
-  "winCondition": {
-    "type": "destroyEnemyFlagship",
-    "targetShipId": "e_flagship"
-  },
-  "ships": [
-    {
-      "instanceId": "p_flagship",
-      "dataId": "flagship",
-      "factionId": 0,
-      "position": [300, 600],
-      "heading": 0,
-      "commandNodeId": "pf_node",
-      "commandNodeType": "flagship"
-    },
-    {
-      "instanceId": "p_relay",
-      "dataId": "command_relay",
-      "factionId": 0,
-      "position": [440, 480],
-      "heading": 0,
-      "commandNodeId": "pr_node",
-      "commandNodeType": "relay",
-      "parentNodeId": "pf_node"
-    },
-    {
-      "instanceId": "p_heavy",
-      "dataId": "heavy_line",
-      "factionId": 0,
-      "position": [340, 720],
-      "heading": 0,
-      "assignedCommandNodeId": "pr_node"
-    },
-    {
-      "instanceId": "p_escort",
-      "dataId": "light_escort",
-      "factionId": 0,
-      "position": [400, 440],
-      "heading": 0,
-      "assignedCommandNodeId": "pr_node"
-    },
-    {
-      "instanceId": "e_flagship",
-      "dataId": "flagship",
-      "factionId": 1,
-      "position": [1700, 600],
-      "heading": 3.14159,
-      "commandNodeId": "ef_node",
-      "commandNodeType": "flagship"
-    },
-    {
-      "instanceId": "e_relay",
-      "dataId": "command_relay",
-      "factionId": 1,
-      "position": [1560, 720],
-      "heading": 3.14159,
-      "commandNodeId": "er_node",
-      "commandNodeType": "relay",
-      "parentNodeId": "ef_node"
-    },
-    {
-      "instanceId": "e_heavy",
-      "dataId": "heavy_line",
-      "factionId": 1,
-      "position": [1660, 480],
-      "heading": 3.14159,
-      "assignedCommandNodeId": "er_node"
-    },
-    {
-      "instanceId": "e_raider",
-      "dataId": "fast_raider",
-      "factionId": 1,
-      "position": [1520, 580],
-      "heading": 3.14159,
-      "assignedCommandNodeId": "er_node"
-    }
+  "playerBudget": 8,
+  "availableSquadTypes": ["lineDivision", "raidPack", "escortScreen"],
+  "winCondition": { "type": "destroyEnemyFlagship" },
+  "factionPostures": { "1": "aggressive" },
+  "playerSquads": [
+    { "squadId": "p_flagship", "type": "flagship", "position": [200, 600], "heading": 0 }
+  ],
+  "enemySquads": [
+    { "squadId": "e_flagship", "type": "flagship", "factionId": 1, "position": [1800, 600], "heading": 3.14159, "engagementMode": "engage" },
+    { "squadId": "e_line_1", "type": "lineDivision", "factionId": 1, "position": [1650, 400], "heading": 3.14159, "engagementMode": "engage" }
   ]
 }

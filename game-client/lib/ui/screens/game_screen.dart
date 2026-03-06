@@ -2,6 +2,7 @@ import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/models/battle_state.dart';
 import '../../data/ships/ship_definitions.dart';
 import '../../game/battle_game.dart';
 import '../widgets/hud_overlay.dart';
@@ -31,6 +32,7 @@ class GameScreen extends StatefulWidget {
   final String scenarioId;
   final bool carryDamage;
   final Map<String, double>? startingDurabilityFractions;
+  final BattleState? initialState;
 
   const GameScreen({
     super.key,
@@ -38,6 +40,7 @@ class GameScreen extends StatefulWidget {
     this.scenarioId = 'scenario_001',
     this.carryDamage = false,
     this.startingDurabilityFractions,
+    this.initialState,
   });
 
   @override
@@ -54,6 +57,7 @@ class _GameScreenState extends State<GameScreen> {
       scenarioAssetPath: widget.scenarioAssetPath,
       carryDamage: widget.carryDamage,
       startingDurabilityFractions: widget.startingDurabilityFractions,
+      initialState: widget.initialState,
     );
   }
 

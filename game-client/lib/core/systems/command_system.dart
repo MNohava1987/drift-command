@@ -29,6 +29,27 @@ class CommandSystem {
     target.orderFlashUntil = state.battleTime + 0.45;
   }
 
+  /// Issue an order to an entire squad. The order is stored on the SquadState
+  /// and propagated to the leader each tick by SquadSystem.
+  void issueSquadOrder({
+    required BattleState state,
+    required String squadId,
+    required OrderType orderType,
+    Vector2? targetPosition,
+    String? targetEnemyId,
+    double targetSpeedFraction = 0.5,
+  }) {
+    final squad = state.squads[squadId];
+    if (squad == null) return;
+    squad.activeOrder = Order(
+      type: orderType,
+      targetPosition: targetPosition,
+      targetShipId: targetEnemyId,
+      targetSpeedFraction: targetSpeedFraction,
+    );
+    squad.orderFlashUntil = state.battleTime + 0.45;
+  }
+
   /// Issue the same order to every alive player ship.
   void issueFleetOrder({
     required BattleState state,

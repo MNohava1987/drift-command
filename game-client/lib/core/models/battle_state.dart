@@ -1,4 +1,5 @@
 import 'ship_data.dart';
+import 'squad.dart';
 
 enum TempoBand { distant, contact, engaged }
 
@@ -13,6 +14,9 @@ class BattleState {
   BattlePhase phase;
 
   final Map<String, ShipState> ships; // keyed by instanceId
+  final Map<String, SquadState> squads; // keyed by squadId
+  final int playerBudget;
+  final List<SquadType> availableSquadTypes;
 
   /// Instance ID of the player's flagship. Used for win/loss and retreat orders.
   final String playerFlagshipId;
@@ -34,6 +38,9 @@ class BattleState {
     required this.ships,
     required this.playerFlagshipId,
     this.enemyFlagshipId,
+    this.squads = const {},
+    this.playerBudget = 0,
+    this.availableSquadTypes = const [],
     this.battleTime = 0.0,
     this.phase = BattlePhase.setup,
     this.tempoBand = TempoBand.distant,
@@ -54,6 +61,19 @@ class BattleState {
 
   ShipState? get enemyFlagship =>
       enemyFlagshipId != null ? ships[enemyFlagshipId] : null;
+
+  Iterable<SquadState> get playerSquads =>
+      squads.values.where((sq) => sq.factionId == playerFactionId);
+
+  Iterable<SquadState> get enemySquads =>
+      squads.values.where((sq) => sq.factionId != playerFactionId);
+
+  bool squadIsAlive(SquadState squad) =>
+      squad.shipInstanceIds.any((id) => ships[id]?.isAlive == true);
+
+  SquadState? get playerFlagshipSquad => squads.values
+      .where((sq) => sq.factionId == playerFactionId && sq.type == SquadType.flagship)
+      .firstOrNull;
 }
 
 /// Describes win/loss conditions for a scenario.

@@ -10,10 +10,13 @@ import 'package:flame_audio/flame_audio.dart';
 
 import '../core/models/battle_state.dart';
 import '../core/models/ship_data.dart';
+import '../core/models/squad.dart';
 import '../core/systems/kinematic_system.dart';
 import '../core/systems/command_system.dart';
 import '../core/systems/tempo_system.dart';
 import '../core/systems/combat_system.dart';
+import '../core/systems/squad_system.dart';
+import '../core/systems/engagement_system.dart';
 import '../core/ai/doctrine_ai.dart';
 import '../core/services/scenario_loader.dart';
 import '../data/ships/ship_definitions.dart';
@@ -25,16 +28,19 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
   final String scenarioAssetPath;
   final bool carryDamage;
   final Map<String, double>? startingDurabilityFractions;
+  final BattleState? initialState;
 
   BattleGame({
     this.scenarioAssetPath = 'assets/scenarios/scenario_001.json',
     this.carryDamage = false,
     this.startingDurabilityFractions,
+    this.initialState,
   });
 
   // ── Systems ──────────────────────────────────────────────────────────────
   final _tempoSystem = TempoSystem();
   final _commandSystem = CommandSystem();
+  final _squadSystem = SquadSystem();
   late final KinematicSystem _kinematics;
   late final CombatSystem _combat;
   late final DoctrineAI _ai;
@@ -42,7 +48,7 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
   // ── State ────────────────────────────────────────────────────────────────
   late BattleState _state;
   bool _isInitialized = false;
-  ShipState? _selectedShip;
+  SquadState? _selectedSquad;
   late BattlefieldRenderer _renderer;
 
   /// Approach speed for the next issued order: 0.25 / 0.5 / 1.0
@@ -65,7 +71,7 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
   bool _audioReady = false;
 
   // ── HUD notifiers (listened to by Flutter widgets) ───────────────────────
-  final selectedShipNotifier = ValueNotifier<ShipState?>(null);
+  final selectedSquadNotifier = ValueNotifier<SquadState?>(null);
   final battlePhaseNotifier = ValueNotifier<BattlePhase>(BattlePhase.setup);
   final battleTimeTextNotifier = ValueNotifier<String>('0:00');
   final isPausedNotifier = ValueNotifier<bool>(false);
@@ -74,23 +80,35 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
   // ── Public accessors ─────────────────────────────────────────────────────
   BattleState get battleState => _state;
   BattleState? get battleStateOrNull => _isInitialized ? _state : null;
-  ShipState? get selectedShipState => _selectedShip;
+  SquadState? get selectedSquadState => _selectedSquad;
 
   @override
   Future<void> onLoad() async {
     _kinematics = KinematicSystem(shipDataRegistry: kShipDefinitions);
     _combat = CombatSystem(shipDataRegistry: kShipDefinitions);
     _combat.onFire = _spawnProjectile;
-    _ai = DoctrineAI(commandSystem: _commandSystem, registry: kShipDefinitions);
-
-    final jsonStr = await rootBundle.loadString(scenarioAssetPath);
-    final jsonMap = jsonDecode(jsonStr) as Map<String, dynamic>;
-    _state = ScenarioLoader.fromJson(
-      jsonMap,
-      kShipDefinitions,
-      carryDamage: carryDamage,
-      startingDurabilityFractions: startingDurabilityFractions,
+    final engagementSystem = EngagementSystem(
+      commandSystem: _commandSystem,
+      registry: kShipDefinitions,
     );
+    _ai = DoctrineAI(
+      commandSystem: _commandSystem,
+      engagementSystem: engagementSystem,
+      registry: kShipDefinitions,
+    );
+
+    if (initialState != null) {
+      _state = initialState!;
+    } else {
+      final jsonStr = await rootBundle.loadString(scenarioAssetPath);
+      final jsonMap = jsonDecode(jsonStr) as Map<String, dynamic>;
+      _state = ScenarioLoader.fromJson(
+        jsonMap,
+        kShipDefinitions,
+        carryDamage: carryDamage,
+        startingDurabilityFractions: startingDurabilityFractions,
+      );
+    }
 
     try {
       await FlameAudio.audioCache.loadAll([
@@ -140,6 +158,7 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
         scaledDt,
         allShips: _state.ships,
       );
+      _squadSystem.update(_state);
 
       final wasAlive = {for (final e in _state.ships.entries) e.key: e.value.isAlive};
       _combat.update(_state, scaledDt);
@@ -186,7 +205,7 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
     final worldPos = _renderer.canvasToWorld(event.localPosition);
     const double selectionRadius = 40.0;
 
-    // Tap a player ship → select it
+    // Tap a player ship → select its squad
     ShipState? tappedPlayer;
     double nearestPlayer = double.infinity;
     for (final ship in _state.ships.values) {
@@ -199,15 +218,16 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
     }
 
     if (tappedPlayer != null) {
-      _selectedShip = tappedPlayer;
-      selectedShipNotifier.value = _selectedShip;
+      final squadId = tappedPlayer.squadId;
+      _selectedSquad = squadId != null ? _state.squads[squadId] : null;
+      selectedSquadNotifier.value = _selectedSquad;
       return;
     }
 
-    // No ship selected — nothing to order
-    if (_selectedShip == null || !_selectedShip!.isAlive) return;
+    // No squad selected — nothing to order
+    if (_selectedSquad == null) return;
 
-    // Tap an enemy → attack order
+    // Tap an enemy → attack order on squad
     ShipState? tappedEnemy;
     double nearestEnemy = double.infinity;
     for (final ship in _state.ships.values) {
@@ -220,62 +240,70 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
     }
 
     if (tappedEnemy != null) {
-      _commandSystem.issueOrder(
+      _commandSystem.issueSquadOrder(
         state: _state,
-        targetShipId: _selectedShip!.instanceId,
+        squadId: _selectedSquad!.squadId,
         orderType: OrderType.attackTarget,
         targetPosition: tappedEnemy.position.clone(),
         targetEnemyId: tappedEnemy.instanceId,
         targetSpeedFraction: selectedSpeed,
       );
     } else {
-      // Tap empty space → move order
-      _commandSystem.issueOrder(
+      // Tap empty space → move squad
+      _commandSystem.issueSquadOrder(
         state: _state,
-        targetShipId: _selectedShip!.instanceId,
+        squadId: _selectedSquad!.squadId,
         orderType: OrderType.moveTo,
         targetPosition: worldPos.clone(),
         targetSpeedFraction: selectedSpeed,
       );
     }
 
-    _spawnOrderPulse(_selectedShip!);
+    _spawnOrderPulse(_selectedSquad!);
     playSound('order_click.ogg');
   }
 
-  /// Issue a HOLD order to the selected ship.
+  /// Issue a HOLD order to the selected squad.
   void issueHold() {
     if (!_isInitialized || _state.phase != BattlePhase.active) return;
-    if (_selectedShip == null || !_selectedShip!.isAlive) return;
-    _commandSystem.issueOrder(
+    if (_selectedSquad == null) return;
+    _commandSystem.issueSquadOrder(
       state: _state,
-      targetShipId: _selectedShip!.instanceId,
+      squadId: _selectedSquad!.squadId,
       orderType: OrderType.hold,
     );
-    _spawnOrderPulse(_selectedShip!);
+    _spawnOrderPulse(_selectedSquad!);
     playSound('order_click.ogg');
   }
 
-  /// Issue a RETREAT order to the selected ship — moves toward player flagship.
+  /// Issue a RETREAT order to the selected squad — moves toward player flagship.
   void issueRetreat() {
     if (!_isInitialized || _state.phase != BattlePhase.active) return;
-    if (_selectedShip == null || !_selectedShip!.isAlive) return;
+    if (_selectedSquad == null) return;
     final flagship = _state.playerFlagship;
-    _commandSystem.issueOrder(
+    _commandSystem.issueSquadOrder(
       state: _state,
-      targetShipId: _selectedShip!.instanceId,
+      squadId: _selectedSquad!.squadId,
       orderType: OrderType.retreat,
       targetPosition: flagship?.position.clone(),
     );
-    _spawnOrderPulse(_selectedShip!);
+    _spawnOrderPulse(_selectedSquad!);
     playSound('order_click.ogg');
   }
 
-  /// Cancel the selected ship's active order.
+  /// Cancel the selected squad's active order and all member ship orders.
   void cancelOrders() {
     if (!_isInitialized) return;
-    if (_selectedShip == null || !_selectedShip!.isAlive) return;
-    _selectedShip!.activeOrder = null;
+    if (_selectedSquad == null) return;
+    _selectedSquad!.activeOrder = null;
+    for (final id in _selectedSquad!.shipInstanceIds) {
+      _state.ships[id]?.activeOrder = null;
+    }
+  }
+
+  /// Update the engagement mode for a squad.
+  void setEngagementMode(String squadId, EngagementMode mode) {
+    _state.squads[squadId]?.engagementMode = mode;
   }
 
   void togglePause() {
@@ -332,14 +360,14 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
     overlays.add(won ? 'win' : 'lose');
   }
 
-  /// Spawns a visual transit pulse from the player flagship to the target ship.
-  void _spawnOrderPulse(ShipState target) {
+  /// Spawns a visual transit pulse from the player flagship to the squad centroid.
+  void _spawnOrderPulse(SquadState squad) {
     final flagship = _state.playerFlagship;
     if (flagship == null) return;
-    final dist = flagship.position.distanceTo(target.position);
+    final dist = flagship.position.distanceTo(squad.centroid);
     spawnTransitPulse(
       flagship.position,
-      target.position,
+      squad.centroid,
       (dist / 40.0).clamp(0.5, 10.0),
     );
   }

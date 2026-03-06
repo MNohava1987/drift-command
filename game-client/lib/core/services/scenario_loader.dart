@@ -1,11 +1,17 @@
+import 'dart:math' as math;
 import 'package:flame/components.dart';
 import '../models/ship_data.dart';
 import '../models/battle_state.dart';
+import '../models/squad.dart';
 
-/// Parses a scenario JSON map into a ready-to-run [BattleState].
+/// Parses a squad-based scenario JSON map into a ready-to-run [BattleState].
 ///
-/// The relay/topology system has been removed. Ships are identified directly
-/// by role. The flagship for each faction is the ship with dataId 'flagship'.
+/// JSON format uses playerSquads/enemySquads arrays. Each squad entry specifies
+/// type, position, heading, and engagementMode. Ships are generated from squad
+/// definitions — instance IDs follow the pattern "{squadId}_ship_{index}".
+///
+/// carryDamage and startingDurabilityFractions are accepted for backwards
+/// compatibility but are not applied — all ships always spawn at full health.
 class ScenarioLoader {
   static BattleState fromJson(
     Map<String, dynamic> json,
@@ -15,68 +21,46 @@ class ScenarioLoader {
   }) {
     final playerFactionId = json['playerFactionId'] as int;
     final objective = json['objective'] as String;
+    final playerBudget = (json['playerBudget'] as num?)?.toInt() ?? 0;
+
+    final availableSquadTypes = <SquadType>[];
+    if (json.containsKey('availableSquadTypes')) {
+      for (final typeStr in json['availableSquadTypes'] as List<dynamic>) {
+        final t = _parseSquadType(typeStr as String);
+        if (t != null) availableSquadTypes.add(t);
+      }
+    }
 
     final shipsMap = <String, ShipState>{};
+    final squadsMap = <String, SquadState>{};
     String? playerFlagshipId;
     String? enemyFlagshipId;
+    String? enemyFlagshipSquadId;
 
-    for (final shipJson in json['ships'] as List<dynamic>) {
-      final s = shipJson as Map<String, dynamic>;
-      final instanceId = s['instanceId'] as String;
-      final dataId = s['dataId'] as String;
-      final factionId = s['factionId'] as int;
-      final posRaw = s['position'] as List<dynamic>;
-      final heading = (s['heading'] as num).toDouble();
-      final data = registry[dataId];
-
-      // Skip ships with unknown dataIds (e.g., removed ship types)
-      if (data == null) continue;
-
-      final maxDurability = data.maxDurability;
-      double startDurability = maxDurability;
-      if (carryDamage &&
-          factionId == playerFactionId &&
-          startingDurabilityFractions != null &&
-          startingDurabilityFractions.containsKey(dataId)) {
-        startDurability =
-            maxDurability * startingDurabilityFractions[dataId]!.clamp(0.0, 1.0);
-      }
-
-      final ship = ShipState(
-        instanceId: instanceId,
-        dataId: dataId,
-        factionId: factionId,
-        position: Vector2(
-          (posRaw[0] as num).toDouble(),
-          (posRaw[1] as num).toDouble(),
-        ),
-        heading: heading,
-        durability: startDurability,
-      );
-
-      shipsMap[instanceId] = ship;
-
-      // Track flagships by role
-      if (data.role == ShipRole.flagship) {
-        if (factionId == playerFactionId) {
-          playerFlagshipId = instanceId;
-        } else {
-          enemyFlagshipId = instanceId;
+    // Player squads
+    if (json.containsKey('playerSquads')) {
+      for (final squadJson in json['playerSquads'] as List<dynamic>) {
+        final sq = squadJson as Map<String, dynamic>;
+        final squad = _parseSquad(sq, playerFactionId, registry, shipsMap);
+        squadsMap[squad.squadId] = squad;
+        if (squad.type == SquadType.flagship) {
+          playerFlagshipId = '${squad.squadId}_ship_0';
         }
       }
     }
 
-    // Fallback: if no flagship role found, use first ship per faction
-    if (playerFlagshipId == null) {
-      playerFlagshipId = shipsMap.values
-          .firstWhere((s) => s.factionId == playerFactionId)
-          .instanceId;
-    }
-    if (enemyFlagshipId == null) {
-      final enemy = shipsMap.values
-          .where((s) => s.factionId != playerFactionId)
-          .firstOrNull;
-      enemyFlagshipId = enemy?.instanceId;
+    // Enemy squads
+    if (json.containsKey('enemySquads')) {
+      for (final squadJson in json['enemySquads'] as List<dynamic>) {
+        final sq = squadJson as Map<String, dynamic>;
+        final factionId = (sq['factionId'] as num?)?.toInt() ?? playerFactionId + 1;
+        final squad = _parseSquad(sq, factionId, registry, shipsMap);
+        squadsMap[squad.squadId] = squad;
+        if (squad.type == SquadType.flagship && factionId != playerFactionId) {
+          enemyFlagshipSquadId = squad.squadId;
+          enemyFlagshipId = '${squad.squadId}_ship_0';
+        }
+      }
     }
 
     // Win condition
@@ -95,9 +79,16 @@ class ScenarioLoader {
         default:
           wcType = WinConditionType.custom;
       }
+      // For destroyEnemyFlagship, compute targetShipId from enemy flagship squad
+      String? targetShipId = wc['targetShipId'] as String?;
+      if (wcType == WinConditionType.destroyEnemyFlagship &&
+          targetShipId == null &&
+          enemyFlagshipSquadId != null) {
+        targetShipId = '${enemyFlagshipSquadId}_ship_0';
+      }
       winCondition = WinCondition(
         type: wcType,
-        targetShipId: wc['targetShipId'] as String?,
+        targetShipId: targetShipId,
         timeLimit: (wc['timeLimit'] as num?)?.toDouble(),
       );
     }
@@ -118,12 +109,89 @@ class ScenarioLoader {
       playerFactionId: playerFactionId,
       objectiveDescription: objective,
       ships: shipsMap,
-      playerFlagshipId: playerFlagshipId!,
+      squads: squadsMap,
+      playerBudget: playerBudget,
+      availableSquadTypes: availableSquadTypes,
+      playerFlagshipId: playerFlagshipId ?? '',
       enemyFlagshipId: enemyFlagshipId,
       winCondition: winCondition,
       factionPostures: factionPostures,
     );
   }
+
+  static SquadState _parseSquad(
+    Map<String, dynamic> sq,
+    int factionId,
+    Map<String, ShipData> registry,
+    Map<String, ShipState> shipsMap,
+  ) {
+    final squadId = sq['squadId'] as String;
+    final type = _parseSquadType(sq['type'] as String) ?? SquadType.flagship;
+    final posRaw = sq['position'] as List<dynamic>;
+    final centroid = Vector2(
+      (posRaw[0] as num).toDouble(),
+      (posRaw[1] as num).toDouble(),
+    );
+    final heading = (sq['heading'] as num?)?.toDouble() ?? 0.0;
+    final engagementMode =
+        _parseEngagementMode(sq['engagementMode'] as String? ?? 'engage');
+
+    final dataIds = SquadState.shipDataIds(type);
+    final offsets = SquadState.formationOffsets(type);
+    final instanceIds = <String>[];
+
+    final cosH = math.cos(heading);
+    final sinH = math.sin(heading);
+
+    for (var i = 0; i < dataIds.length; i++) {
+      final dataId = dataIds[i];
+      final data = registry[dataId];
+      if (data == null) continue;
+
+      final offset = i < offsets.length ? offsets[i] : Vector2.zero();
+      final rx = offset.x * cosH - offset.y * sinH;
+      final ry = offset.x * sinH + offset.y * cosH;
+      final worldPos = Vector2(centroid.x + rx, centroid.y + ry);
+
+      final instanceId = '${squadId}_ship_$i';
+      instanceIds.add(instanceId);
+
+      shipsMap[instanceId] = ShipState(
+        instanceId: instanceId,
+        dataId: dataId,
+        factionId: factionId,
+        position: worldPos,
+        heading: heading,
+        durability: data.maxDurability,
+        squadId: squadId,
+      );
+    }
+
+    return SquadState(
+      squadId: squadId,
+      type: type,
+      factionId: factionId,
+      centroid: centroid,
+      heading: heading,
+      shipInstanceIds: instanceIds,
+      engagementMode: engagementMode,
+    );
+  }
+
+  static SquadType? _parseSquadType(String value) => switch (value) {
+        'flagship' => SquadType.flagship,
+        'lineDivision' => SquadType.lineDivision,
+        'raidPack' => SquadType.raidPack,
+        'carrierStrike' => SquadType.carrierStrike,
+        'escortScreen' => SquadType.escortScreen,
+        _ => null,
+      };
+
+  static EngagementMode _parseEngagementMode(String value) => switch (value) {
+        'direct' => EngagementMode.direct,
+        'ghost' => EngagementMode.ghost,
+        _ => EngagementMode.engage,
+      };
 
   static AiPosture _parsePosture(String value) => switch (value) {
         'aggressive' => AiPosture.aggressive,

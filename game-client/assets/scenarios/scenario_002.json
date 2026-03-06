@@ -1,106 +1,19 @@
 {
   "id": "scenario_002",
   "name": "Relay Hunt",
-  "objective": "Destroy all enemy ships",
+  "objective": "Destroy all enemy forces",
   "playerFactionId": 0,
-  "factionPostures": {"1": "flanking"},
-  "winCondition": {
-    "type": "destroyAllEnemies"
-  },
-  "ships": [
-    {
-      "instanceId": "p_flagship",
-      "dataId": "flagship",
-      "factionId": 0,
-      "position": [260, 600],
-      "heading": 0,
-      "commandNodeId": "pf_node",
-      "commandNodeType": "flagship"
-    },
-    {
-      "instanceId": "p_relay",
-      "dataId": "command_relay",
-      "factionId": 0,
-      "position": [400, 540],
-      "heading": 0,
-      "commandNodeId": "pr_node",
-      "commandNodeType": "relay",
-      "parentNodeId": "pf_node"
-    },
-    {
-      "instanceId": "p_heavy",
-      "dataId": "heavy_line",
-      "factionId": 0,
-      "position": [350, 680],
-      "heading": 0,
-      "assignedCommandNodeId": "pr_node"
-    },
-    {
-      "instanceId": "e_flagship",
-      "dataId": "flagship",
-      "factionId": 1,
-      "position": [1740, 600],
-      "heading": 3.14159,
-      "commandNodeId": "ef_node",
-      "commandNodeType": "flagship"
-    },
-    {
-      "instanceId": "e_relay",
-      "dataId": "command_relay",
-      "factionId": 1,
-      "position": [1600, 500],
-      "heading": 3.14159,
-      "commandNodeId": "er_node",
-      "commandNodeType": "relay",
-      "parentNodeId": "ef_node"
-    },
-    {
-      "instanceId": "e_heavy_1",
-      "dataId": "heavy_line",
-      "factionId": 1,
-      "position": [1640, 740],
-      "heading": 3.14159,
-      "assignedCommandNodeId": "ef_node"
-    },
-    {
-      "instanceId": "e_heavy_2",
-      "dataId": "heavy_line",
-      "factionId": 1,
-      "position": [1520, 620],
-      "heading": 3.14159,
-      "assignedCommandNodeId": "er_node"
-    },
-    {
-      "instanceId": "e_escort_1",
-      "dataId": "light_escort",
-      "factionId": 1,
-      "position": [1680, 400],
-      "heading": 3.14159,
-      "assignedCommandNodeId": "er_node"
-    },
-    {
-      "instanceId": "e_escort_2",
-      "dataId": "light_escort",
-      "factionId": 1,
-      "position": [1580, 860],
-      "heading": 3.14159,
-      "assignedCommandNodeId": "er_node"
-    },
-    {
-      "instanceId": "e_raider_1",
-      "dataId": "fast_raider",
-      "factionId": 1,
-      "position": [1440, 540],
-      "heading": 3.14159,
-      "assignedCommandNodeId": "ef_node"
-    },
-    {
-      "instanceId": "e_raider_2",
-      "dataId": "fast_raider",
-      "factionId": 1,
-      "position": [1460, 760],
-      "heading": 3.14159,
-      "assignedCommandNodeId": "ef_node"
-    }
+  "playerBudget": 8,
+  "availableSquadTypes": ["lineDivision", "raidPack", "escortScreen", "carrierStrike"],
+  "winCondition": { "type": "destroyAllEnemies" },
+  "factionPostures": { "1": "flanking" },
+  "playerSquads": [
+    { "squadId": "p_flagship", "type": "flagship", "position": [200, 600], "heading": 0 }
+  ],
+  "enemySquads": [
+    { "squadId": "e_flagship", "type": "flagship", "factionId": 1, "position": [1800, 600], "heading": 3.14159, "engagementMode": "engage" },
+    { "squadId": "e_line_1", "type": "lineDivision", "factionId": 1, "position": [1650, 350], "heading": 3.14159, "engagementMode": "engage" },
+    { "squadId": "e_line_2", "type": "lineDivision", "factionId": 1, "position": [1650, 850], "heading": 3.14159, "engagementMode": "engage" },
+    { "squadId": "e_raid_1", "type": "raidPack", "factionId": 1, "position": [1550, 600], "heading": 3.14159, "engagementMode": "engage" }
   ]
 }

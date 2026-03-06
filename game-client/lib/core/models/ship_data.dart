@@ -3,7 +3,6 @@ import 'package:flame/components.dart';
 /// The role that defines a ship's tactical identity and behavior profile.
 enum ShipRole {
   flagship,
-  commandRelay, // kept for scenario backward-compat; treated as lightEscort in logic
   heavyLine,
   lightEscort,
   strikeCarrier,
@@ -60,6 +59,7 @@ class ShipState {
   final String instanceId;
   final String dataId;      // references ShipData.id
   final int factionId;
+  String? squadId;
 
   Vector2 position;
   Vector2 velocity;
@@ -82,6 +82,7 @@ class ShipState {
     required this.position,
     required this.heading,
     required this.durability,
+    this.squadId,
     this.activeDoctrine = Doctrine.hold,
   })  : velocity = Vector2.zero(),
         isAlive = true,

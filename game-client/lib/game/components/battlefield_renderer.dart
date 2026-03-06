@@ -4,6 +4,7 @@ import 'package:flame/components.dart';
 
 import '../../core/models/ship_data.dart';
 import '../../core/models/battle_state.dart';
+import '../../core/models/squad.dart';
 import '../../data/ships/ship_definitions.dart';
 import '../battle_game.dart';
 
@@ -37,10 +38,8 @@ class BattlefieldRenderer extends Component {
 
   static const int _playerBase = 0xFF4A90D9;
   static const int _playerFlagship = 0xFF74B4FF;
-  static const int _playerRelay = 0xFF6A9AC8;
   static const int _enemyBase = 0xFFD94A4A;
   static const int _enemyFlagship = 0xFFFF7474;
-  static const int _enemyRelay = 0xFFC46A6A;
 
   final BattleGame game;
 
@@ -133,7 +132,8 @@ class BattlefieldRenderer extends Component {
     if (state == null) return;
     _drawBackground(canvas);
     _drawTacticalGrid(canvas);
-    _drawCommandChainLines(canvas, state);
+    _drawSquadBoundaries(canvas, state);
+    _drawSquadRoutes(canvas, state);
     _drawTrajectories(canvas, state);
     _drawSensorGhosts(canvas, state);
     _drawOrderLines(canvas, state);
@@ -299,10 +299,12 @@ class BattlefieldRenderer extends Component {
   // ── Ships ─────────────────────────────────────────────────────────────────
 
   void _drawShips(Canvas canvas, BattleState state) {
-    final selectedShip = game.selectedShipState;
+    final selectedSquadId = game.selectedSquadState?.squadId;
     for (final ship in state.ships.values) {
       if (!ship.isAlive) continue;
-      _drawShip(canvas, ship, state, selected: ship == selectedShip);
+      final inSelectedSquad =
+          selectedSquadId != null && ship.squadId == selectedSquadId;
+      _drawShip(canvas, ship, state, selected: inSelectedSquad);
     }
   }
 
@@ -507,11 +509,6 @@ class BattlefieldRenderer extends Component {
         p.lineTo(-12 * scale, 0);
         p.lineTo(-10 * scale, 7 * scale);
         p.lineTo(3 * scale, 7 * scale);
-      case ShipRole.commandRelay:
-        p.moveTo(0, -6 * scale);
-        p.lineTo(5 * scale, 0);
-        p.lineTo(0, 6 * scale);
-        p.lineTo(-5 * scale, 0);
     }
     p.close();
     return p;
@@ -541,7 +538,6 @@ class BattlefieldRenderer extends Component {
   // ── Order lines ───────────────────────────────────────────────────────────
 
   void _drawOrderLines(Canvas canvas, BattleState state) {
-    final selectedShip = game.selectedShipState;
     for (final ship in state.ships.values) {
       if (!ship.isAlive) continue;
       final sc = worldToCanvas(ship.position);
@@ -549,7 +545,6 @@ class BattlefieldRenderer extends Component {
 
       // Active order: solid cyan line from ship → current target
       final active = ship.activeOrder;
-      Offset? lastWaypoint;
       if (active?.targetPosition != null) {
         final tc = worldToCanvas(active!.targetPosition!);
         final to = Offset(tc.x, tc.y);
@@ -560,7 +555,6 @@ class BattlefieldRenderer extends Component {
             ..color = const Color(0xFF00FFFF).withAlpha(160)
             ..strokeWidth = 1.2,
         );
-        lastWaypoint = to;
       }
 
     }
@@ -648,16 +642,13 @@ class BattlefieldRenderer extends Component {
     if (role == ShipRole.flagship) {
       return Color(isPlayer ? _playerFlagship : _enemyFlagship);
     }
-    if (role == ShipRole.commandRelay) {
-      return Color(isPlayer ? _playerRelay : _enemyRelay);
-    }
     return Color(isPlayer ? _playerBase : _enemyBase);
   }
 
   double _radiusForRole(ShipRole role) => switch (role) {
         ShipRole.flagship => 12.0,
         ShipRole.heavyLine => 9.0,
-        ShipRole.commandRelay || ShipRole.strikeCarrier => 6.0,
+        ShipRole.strikeCarrier => 6.0,
         ShipRole.lightEscort || ShipRole.fastRaider => 4.0,
       };
 
@@ -667,12 +658,10 @@ class BattlefieldRenderer extends Component {
         ShipRole.strikeCarrier => 200.0,
         ShipRole.lightEscort => 100.0,
         ShipRole.fastRaider => 90.0,
-        ShipRole.commandRelay => 80.0,
       };
 
   String _labelForRole(ShipRole role) => switch (role) {
         ShipRole.flagship => 'F',
-        ShipRole.commandRelay => 'R',
         ShipRole.heavyLine => 'H',
         ShipRole.lightEscort => 'E',
         ShipRole.strikeCarrier => 'C',
@@ -705,23 +694,114 @@ class BattlefieldRenderer extends Component {
     );
   }
 
-  // ── Command chain lines ────────────────────────────────────────────────────
+  // ── Squad boundaries ───────────────────────────────────────────────────────
 
-  void _drawCommandChainLines(Canvas canvas, BattleState state) {
-    final flagship = state.playerFlagship;
-    if (flagship == null || !flagship.isAlive) return;
+  void _drawSquadBoundaries(Canvas canvas, BattleState state) {
+    final selectedSquadId = game.selectedSquadState?.squadId;
 
-    final flagshipC = worldToCanvas(flagship.position);
-    final flagshipO = Offset(flagshipC.x, flagshipC.y);
+    for (final squad in state.squads.values) {
+      final aliveShips = squad.shipInstanceIds
+          .map((id) => state.ships[id])
+          .where((s) => s != null && s.isAlive)
+          .cast<ShipState>()
+          .toList();
+      if (aliveShips.isEmpty) continue;
 
-    final linePaint = Paint()
-      ..color = const Color(0x1AFFFFFF)
-      ..strokeWidth = 0.8;
+      final isPlayer = squad.factionId == state.playerFactionId;
+      final isSelected = squad.squadId == selectedSquadId;
+      final centroid = worldToCanvas(squad.centroid);
+      final co = Offset(centroid.x, centroid.y);
 
-    for (final ship in state.playerShips) {
-      if (!ship.isAlive || ship.instanceId == flagship.instanceId) continue;
-      final shipC = worldToCanvas(ship.position);
-      canvas.drawLine(flagshipO, Offset(shipC.x, shipC.y), linePaint);
+      // Bounding radius: furthest alive ship from centroid + ship radius buffer
+      var boundR = 30.0;
+      for (final ship in aliveShips) {
+        final role = _roleForShip(ship, state);
+        final dist = squad.centroid.distanceTo(ship.position) +
+            _radiusForRole(role) + 8.0;
+        if (dist > boundR) boundR = dist;
+      }
+      final canvasR = boundR * _es;
+
+      final boundColor = isPlayer
+          ? (isSelected
+              ? const Color(0xFF4A90D9)
+              : const Color(0xFF2A5080))
+          : const Color(0xFF803030);
+
+      canvas.drawCircle(
+        co,
+        canvasR,
+        Paint()
+          ..color = boundColor.withAlpha(isSelected ? 55 : 20)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = isSelected ? 1.5 : 0.8,
+      );
+
+      // Engagement mode badge — player squads only
+      if (isPlayer) {
+        final modeLabel = switch (squad.engagementMode) {
+          EngagementMode.direct => 'D',
+          EngagementMode.engage => 'E',
+          EngagementMode.ghost => 'G',
+        };
+        final modeColor = switch (squad.engagementMode) {
+          EngagementMode.direct => const Color(0xFF00CCCC),
+          EngagementMode.engage => const Color(0xFFD94A3A),
+          EngagementMode.ghost => const Color(0xFF9999CC),
+        };
+        _drawBadgeLabel(
+          canvas,
+          modeLabel,
+          Offset(co.dx + canvasR * 0.65, co.dy - canvasR * 0.65),
+          modeColor,
+        );
+      }
+    }
+  }
+
+  void _drawBadgeLabel(Canvas canvas, String text, Offset pos, Color color) {
+    final pb = ParagraphBuilder(
+      ParagraphStyle(textAlign: TextAlign.center),
+    )
+      ..pushStyle(TextStyle(
+        color: color,
+        fontSize: 8.0,
+        fontWeight: FontWeight.bold,
+      ))
+      ..addText(text);
+    final para = pb.build()..layout(ParagraphConstraints(width: 16));
+    canvas.drawParagraph(
+      para,
+      Offset(pos.dx - 8, pos.dy - para.height / 2),
+    );
+  }
+
+  // ── Squad routes ───────────────────────────────────────────────────────────
+
+  void _drawSquadRoutes(Canvas canvas, BattleState state) {
+    for (final squad in state.playerSquads) {
+      final order = squad.activeOrder;
+      if (order?.targetPosition == null) continue;
+
+      final fromC = worldToCanvas(squad.centroid);
+      final toC = worldToCanvas(order!.targetPosition!);
+
+      final routeColor = switch (squad.engagementMode) {
+        EngagementMode.direct => const Color(0xFF00CCCC),
+        EngagementMode.engage => const Color(0xFFD94A3A),
+        EngagementMode.ghost => const Color(0xFF9999CC),
+      };
+
+      final paint = Paint()
+        ..color = routeColor.withAlpha(120)
+        ..strokeWidth = 1.2;
+
+      canvas.drawLine(
+        Offset(fromC.x, fromC.y),
+        Offset(toC.x, toC.y),
+        paint,
+      );
+      _drawArrow(canvas, fromC, toC, paint);
     }
   }
 

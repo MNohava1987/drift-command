@@ -3,163 +3,22 @@
   "name": "Last Stand",
   "objective": "Survive for 4 minutes",
   "playerFactionId": 0,
-  "factionPostures": {"1": "holdAndFire"},
-  "winCondition": {
-    "type": "surviveUntilTime",
-    "timeLimit": 240.0
-  },
-  "ships": [
-    {
-      "instanceId": "p_flagship",
-      "dataId": "flagship",
-      "factionId": 0,
-      "position": [200, 600],
-      "heading": 0,
-      "commandNodeId": "pf_node",
-      "commandNodeType": "flagship"
-    },
-    {
-      "instanceId": "p_relay",
-      "dataId": "command_relay",
-      "factionId": 0,
-      "position": [320, 500],
-      "heading": 0,
-      "commandNodeId": "pr_node",
-      "commandNodeType": "relay",
-      "parentNodeId": "pf_node"
-    },
-    {
-      "instanceId": "p_heavy_1",
-      "dataId": "heavy_line",
-      "factionId": 0,
-      "position": [360, 400],
-      "heading": 0,
-      "assignedCommandNodeId": "pr_node"
-    },
-    {
-      "instanceId": "p_heavy_2",
-      "dataId": "heavy_line",
-      "factionId": 0,
-      "position": [360, 700],
-      "heading": 0,
-      "assignedCommandNodeId": "pr_node"
-    },
-    {
-      "instanceId": "p_escort_1",
-      "dataId": "light_escort",
-      "factionId": 0,
-      "position": [280, 320],
-      "heading": 0,
-      "assignedCommandNodeId": "pr_node"
-    },
-    {
-      "instanceId": "p_escort_2",
-      "dataId": "light_escort",
-      "factionId": 0,
-      "position": [280, 880],
-      "heading": 0,
-      "assignedCommandNodeId": "pr_node"
-    },
-    {
-      "instanceId": "e_flagship",
-      "dataId": "flagship",
-      "factionId": 1,
-      "position": [1800, 600],
-      "heading": 3.14159,
-      "commandNodeId": "ef_node",
-      "commandNodeType": "flagship"
-    },
-    {
-      "instanceId": "e_relay_1",
-      "dataId": "command_relay",
-      "factionId": 1,
-      "position": [1640, 400],
-      "heading": 3.14159,
-      "commandNodeId": "er1_node",
-      "commandNodeType": "relay",
-      "parentNodeId": "ef_node"
-    },
-    {
-      "instanceId": "e_relay_2",
-      "dataId": "command_relay",
-      "factionId": 1,
-      "position": [1640, 800],
-      "heading": 3.14159,
-      "commandNodeId": "er2_node",
-      "commandNodeType": "relay",
-      "parentNodeId": "ef_node"
-    },
-    {
-      "instanceId": "e_heavy_1",
-      "dataId": "heavy_line",
-      "factionId": 1,
-      "position": [1560, 280],
-      "heading": 3.14159,
-      "assignedCommandNodeId": "er1_node"
-    },
-    {
-      "instanceId": "e_heavy_2",
-      "dataId": "heavy_line",
-      "factionId": 1,
-      "position": [1560, 500],
-      "heading": 3.14159,
-      "assignedCommandNodeId": "er1_node"
-    },
-    {
-      "instanceId": "e_heavy_3",
-      "dataId": "heavy_line",
-      "factionId": 1,
-      "position": [1560, 700],
-      "heading": 3.14159,
-      "assignedCommandNodeId": "er2_node"
-    },
-    {
-      "instanceId": "e_heavy_4",
-      "dataId": "heavy_line",
-      "factionId": 1,
-      "position": [1560, 920],
-      "heading": 3.14159,
-      "assignedCommandNodeId": "er2_node"
-    },
-    {
-      "instanceId": "e_carrier",
-      "dataId": "strike_carrier",
-      "factionId": 1,
-      "position": [1720, 300],
-      "heading": 3.14159,
-      "assignedCommandNodeId": "ef_node"
-    },
-    {
-      "instanceId": "e_escort_1",
-      "dataId": "light_escort",
-      "factionId": 1,
-      "position": [1480, 400],
-      "heading": 3.14159,
-      "assignedCommandNodeId": "er1_node"
-    },
-    {
-      "instanceId": "e_escort_2",
-      "dataId": "light_escort",
-      "factionId": 1,
-      "position": [1480, 800],
-      "heading": 3.14159,
-      "assignedCommandNodeId": "er2_node"
-    },
-    {
-      "instanceId": "e_raider_1",
-      "dataId": "fast_raider",
-      "factionId": 1,
-      "position": [1400, 560],
-      "heading": 3.14159,
-      "assignedCommandNodeId": "ef_node"
-    },
-    {
-      "instanceId": "e_raider_2",
-      "dataId": "fast_raider",
-      "factionId": 1,
-      "position": [1400, 640],
-      "heading": 3.14159,
-      "assignedCommandNodeId": "ef_node"
-    }
+  "playerBudget": 12,
+  "availableSquadTypes": ["lineDivision", "raidPack", "escortScreen", "carrierStrike"],
+  "winCondition": { "type": "surviveUntilTime", "timeLimit": 240 },
+  "factionPostures": { "1": "aggressive" },
+  "playerSquads": [
+    { "squadId": "p_flagship", "type": "flagship", "position": [200, 600], "heading": 0 }
+  ],
+  "enemySquads": [
+    { "squadId": "e_flagship", "type": "flagship", "factionId": 1, "position": [1800, 600], "heading": 3.14159, "engagementMode": "engage" },
+    { "squadId": "e_line_1", "type": "lineDivision", "factionId": 1, "position": [1650, 200], "heading": 3.14159, "engagementMode": "engage" },
+    { "squadId": "e_line_2", "type": "lineDivision", "factionId": 1, "position": [1650, 500], "heading": 3.14159, "engagementMode": "engage" },
+    { "squadId": "e_line_3", "type": "lineDivision", "factionId": 1, "position": [1650, 700], "heading": 3.14159, "engagementMode": "engage" },
+    { "squadId": "e_line_4", "type": "lineDivision", "factionId": 1, "position": [1650, 1000], "heading": 3.14159, "engagementMode": "engage" },
+    { "squadId": "e_escort_1", "type": "escortScreen", "factionId": 1, "position": [1550, 600], "heading": 3.14159, "engagementMode": "engage" },
+    { "squadId": "e_carrier_1", "type": "carrierStrike", "factionId": 1, "position": [1900, 600], "heading": 3.14159, "engagementMode": "engage" },
+    { "squadId": "e_raid_1", "type": "raidPack", "factionId": 1, "position": [1700, 350], "heading": 3.14159, "engagementMode": "engage" },
+    { "squadId": "e_raid_2", "type": "raidPack", "factionId": 1, "position": [1700, 850], "heading": 3.14159, "engagementMode": "engage" }
   ]
 }
