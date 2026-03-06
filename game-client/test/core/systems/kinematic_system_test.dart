@@ -54,7 +54,7 @@ void main() {
     expect(ship.velocity, Vector2.zero());
   });
 
-  test('ship with no orders maintains velocity (coasts)', () {
+  test('ship with no pending orders brakes to a stop (auto-hold)', () {
     final system = KinematicSystem(shipDataRegistry: registry);
     final ship = ShipState(
       instanceId: 'ship1',
@@ -65,11 +65,10 @@ void main() {
       durability: 100,
     )..velocity = Vector2(10, 0);
 
+    // Ship moved in the braking direction (forward), but braking reduced speed
     system.update([ship], 1.0);
-
-    // With no orders the ship coasts (no deceleration triggered),
-    // position moves by velocity * dt
     expect(ship.position.x, greaterThan(0));
+    expect(ship.velocity.length, lessThan(10.0)); // speed reduced by braking
   });
 
   test('heavy ship max speed is lower than light ship max speed', () {

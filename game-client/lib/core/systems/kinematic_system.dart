@@ -48,7 +48,11 @@ class KinematicSystem {
   ) {
     final order = ship.activeOrder;
     if (order == null) {
-      // No order — coast (do not decelerate automatically)
+      // No active order and nothing pending — ship brakes to a stop (holds
+      // position). Ships without orders should not drift indefinitely.
+      if (ship.pendingOrders.isEmpty) {
+        _applyBraking(ship, data, dt);
+      }
       return;
     }
 
@@ -129,19 +133,26 @@ class KinematicSystem {
     final maxSpeed = _maxSpeedForClass(data.massClass) * speedFraction.clamp(0.1, 1.0);
     final currentSpeed = ship.velocity.length;
 
-    // Arrived and stopped
-    if (distance < 8.0 && currentSpeed < 4.0) {
+    // Arrived: within 20 world units and slow, OR within 5 units (caught overshoot).
+    if ((distance < 5.0 && currentSpeed < 20.0) ||
+        (distance < 20.0 && currentSpeed < 10.0)) {
       ship.velocity = Vector2.zero();
       return true;
     }
 
     if (stopAtTarget) {
-      // Proportional speed cap: limit approach speed so the ship eases in
-      // smoothly rather than rushing to full speed then slamming the brakes.
-      // safeSpeed = sqrt(2 * a * distance * 0.8) — at safe speed, ship can
-      // stop within the remaining distance with a small margin.
+      // Physics-based braking trigger: start braking when remaining distance
+      // is within 1.3× the current stopping distance (v² / 2a).
+      final stoppingDist =
+          (currentSpeed * currentSpeed) / (2 * data.maxAcceleration + 0.001);
+      if (distance <= stoppingDist * 1.3) {
+        _applyBraking(ship, data, dt);
+        return false;
+      }
+      // Closing phase: proportional speed cap so the ship eases in rather
+      // than approaching at maximum speed and then slamming brakes.
       final safeApproachSpeed =
-          math.sqrt(2.0 * data.maxAcceleration * distance * 0.8 + 0.01);
+          math.sqrt(2.0 * data.maxAcceleration * distance * 0.5 + 0.01);
       _steerToward(ship, data, target, dt, math.min(maxSpeed, safeApproachSpeed));
       return false;
     }

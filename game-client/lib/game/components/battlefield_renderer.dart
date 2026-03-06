@@ -513,30 +513,50 @@ class BattlefieldRenderer extends Component {
   // ── Order lines ───────────────────────────────────────────────────────────
 
   void _drawOrderLines(Canvas canvas, BattleState state) {
+    final selectedShip = game.selectedShipState;
     for (final ship in state.ships.values) {
       if (!ship.isAlive) continue;
       final sc = worldToCanvas(ship.position);
       final so = Offset(sc.x, sc.y);
 
+      // Active order: solid cyan line from ship → current target
       final active = ship.activeOrder;
+      Offset? lastWaypoint;
       if (active?.targetPosition != null) {
         final tc = worldToCanvas(active!.targetPosition!);
+        final to = Offset(tc.x, tc.y);
         canvas.drawLine(
           so,
-          Offset(tc.x, tc.y),
+          to,
           Paint()
             ..color = const Color(0xFF00FFFF).withAlpha(160)
             ..strokeWidth = 1.2,
         );
+        lastWaypoint = to;
       }
 
-      final pendingPaint = Paint()
-        ..color = const Color(0xFFFFDD44).withAlpha(160)
-        ..strokeWidth = 1.0;
-      for (final order in ship.pendingOrders) {
-        if (order.targetPosition == null) continue;
-        final tc = worldToCanvas(order.targetPosition!);
-        _drawDashedLine(canvas, so, Offset(tc.x, tc.y), pendingPaint);
+      // Pending waypoints: only for selected ship, drawn as a connected chain.
+      // This shows the full planned route: ship → wp1 → wp2 → wp3 …
+      if (ship == selectedShip && ship.pendingOrders.isNotEmpty) {
+        final pendingPaint = Paint()
+          ..color = const Color(0xFFFFDD44).withAlpha(180)
+          ..strokeWidth = 1.0;
+        final dotPaint = Paint()
+          ..color = const Color(0xFFFFDD44).withAlpha(200)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.2;
+
+        Offset chainFrom = lastWaypoint ?? so;
+        for (final order in ship.pendingOrders) {
+          if (order.targetPosition == null) continue;
+          final tc = worldToCanvas(order.targetPosition!);
+          final to = Offset(tc.x, tc.y);
+          _drawDashedLine(canvas, chainFrom, to, pendingPaint,
+              dashLength: 5.0, gapLength: 4.0);
+          // Waypoint circle marker
+          canvas.drawCircle(to, 5.0, dotPaint);
+          chainFrom = to;
+        }
       }
     }
   }

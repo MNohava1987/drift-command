@@ -218,9 +218,11 @@ class BattleGame extends FlameGame with TapCallbacks, ScrollDetector {
       }
     }
 
-    // Player tap always interrupts the current active order — "tap here, go here"
-    // immediately. The pending queue (HOLD, RETREAT buttons) is unaffected.
-    _selectedShip!.activeOrder = null;
+    // Tap appends to the route — ship executes queued waypoints in order.
+    // Use CANCEL to clear all orders and interrupt mid-route.
+    // Cap the pending queue to prevent runaway chains.
+    const int maxPending = 6;
+    if (_selectedShip!.pendingOrders.length >= maxPending) return;
 
     if (tappedEnemy != null) {
       _commandSystem.issueOrder(
